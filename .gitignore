@@ -89,4 +89,14 @@ ENV/
 # Rope project settings
 .ropeproject
 
-.DS_Store
+# Local OS files
+**/.DS_Store*
+
+# Directories and files  containing analysis results
+dump/*
+results.db
+docs/_build
+docs/_static
+export/*
+
+
