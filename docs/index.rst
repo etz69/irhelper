@@ -205,9 +205,12 @@ Final Report
 Contributing - We need you !
 ====================================
 
-There are two ways you can contribute
+There are different ways you can contribute
+
 * Write documentation
+
 * Write code
+
 * Report bugs
 
 
