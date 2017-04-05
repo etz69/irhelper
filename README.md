@@ -14,10 +14,14 @@ cd irhelper
 virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python irhelper.py --initdb --debug templates/report.html sample001.bin
 
 vi settings.py
 Edit all locations with the full path of your irhelper installation
+
+And Play !
+python irhelper.py --initdb --debug templates/report.html sample001.bin
+
+
 
 ```
 
