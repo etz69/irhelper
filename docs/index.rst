@@ -203,7 +203,7 @@ Final Report
    :alt: report_screenshot
 
 Contributing - We need you !
-==================
+====================================
 
 There are two ways you can contribute
 * Write documentation
@@ -213,7 +213,7 @@ There are two ways you can contribute
 
 
 Development
-=====
+=======================
 
 
 You can also run each module on its own while testing::
@@ -267,7 +267,7 @@ Research
 =========
 
 Step 1: Prep evidence and data reduction
-------------------------
+-----------------------------------------
 
 action: Hash lists from NSRL
 description: Download known MD5 hashes from NSRL for minimizing the false positives
@@ -292,7 +292,7 @@ https://github.com/Yara-Rules/rules
 https://malwareconfig.com/stats/
 
 Step 4: Automated memory analysis
-------------------------
+---------------------------------
 
 
 .. toctree::
@@ -310,7 +310,7 @@ Indices and tables
 Module documentation
 ====================
 
-.. automodule:: cmd_processor
+.. automodule:: modules.cmd_processor
 .. autoclass:: Modules
     :members:
 
