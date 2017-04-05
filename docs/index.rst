@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-About
-=====
+About (work in progress)
+=========================
 
 A play POC tool for first quick analysis of memory images for fun and learning!
 
