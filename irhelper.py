@@ -4,7 +4,7 @@ from jinja2 import Environment, FileSystemLoader
 import ConfigParser
 
 from modules.db.ops import *
-import cmd_processor
+from modules import cmd_processor
 
 GLOBALS = {}
 GLOBALS['_VOLATILITY_PROFILE'] = ""
