@@ -1,6 +1,28 @@
 # irhelper
 A play POC tool for initial quick analysis of memory images for fun and learning!
 
+Quick install
+---
+External prerequsites:
+
+* volatility
+* exiftool
+
+```
+git clone https://github.com/etz69/irhelper.git
+cd irhelper
+virtualenv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python irhelper.py --initdb --debug templates/report.html sample001.bin
+
+vi settings.py
+Edit all locations with the full path of your irhelper installation
+
+```
+
+
+
 ```
 python irhelper.py -h
 

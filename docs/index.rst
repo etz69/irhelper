@@ -13,6 +13,10 @@ the tasks an analyst would perform when acquiring a memory dump. It was
 inspired by the SANS Windows Forensic Analysis poster which provides steps
 to perform during DFIR assuming both disk and memory dumps are available.
 
+https://digital-forensics.sans.org/community/cheat-sheets
+
+https://digital-forensics.sans.org/media/poster-windows-forensics-2016.pdf
+
 * Step 01: Prep Evidence/Data Reduction
 
 * Step 02: Anti-Virus Checks
@@ -106,6 +110,11 @@ IRHelper concepts
 Prerequisites
 ==================
 
+External prerequisites
+
+* Exiftool
+* Volatility
+
 
 Install
 ==================
@@ -113,7 +122,7 @@ Installation is quick and easy::
 
     git clone https://github.com/etz69/irhelper.git
     cd irhelper
-    virtualenv dev
+    virtualenv venv
     source dev/bin/activate
     pip install -r REQUIREMENTS.txt
 
@@ -193,8 +202,19 @@ Final Report
    :scale: 50 %
    :alt: report_screenshot
 
-Development
+Contributing - We need you !
 ==================
+
+There are two ways you can contribute
+* Write documentation
+* Write code
+* Report bugs
+
+
+
+Development
+=====
+
 
 You can also run each module on its own while testing::
 
@@ -241,6 +261,39 @@ Logging
 
 Database
 --------
+
+
+Research
+=========
+
+Step 1: Prep evidence and data reduction
+------------------------
+
+action: Hash lists from NSRL
+description: Download known MD5 hashes from NSRL for minimizing the false positives
+https://www.nsrl.nist.gov/Downloads.htm
+http://nsrlquery.sourceforge.net
+references: -
+feature: -
+
+Step 2: AV Checks
+------------------------
+
+action: Run AV scans
+description: Run AV scan on extracted executables and dlls
+references: -
+feature: -
+
+
+Step 3: IOC search
+------------------------
+
+https://github.com/Yara-Rules/rules
+https://malwareconfig.com/stats/
+
+Step 4: Automated memory analysis
+------------------------
+
 
 .. toctree::
    :maxdepth: 2
