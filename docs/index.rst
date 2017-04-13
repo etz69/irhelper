@@ -110,10 +110,16 @@ IRHelper concepts
 Prerequisites
 ==================
 
-External prerequisites
+There are some 3rd party tools which are required to run the different modules. One basic one is Volatilty. Volatility has to
+be available in your path otherwise it will not be found from the modules and and you have to specify the full path. Currently
+volatility 2.5 was used for the development of the current code.
+
+Other tools are used such as:
 
 * Exiftool
-* Volatility
+* ClamAV
+* RegRipper
+
 
 
 Install
@@ -124,7 +130,7 @@ Installation is quick and easy::
     cd irhelper
     virtualenv venv
     source dev/bin/activate
-    pip install -r REQUIREMENTS.txt
+    pip install -r requirements.txt
 
 
 Directory structure
@@ -205,9 +211,12 @@ Final Report
 Contributing - We need you !
 ====================================
 
-There are two ways you can contribute
+There are different ways you can contribute
+
 * Write documentation
+
 * Write code
+
 * Report bugs
 
 
@@ -259,8 +268,23 @@ You can also run each module on its own while testing::
 Logging
 -------
 
+For logging purposes there are two methods used::
+
+    debug()
+    err()
+    print_header()
+
+And the standard print!
+
 Database
 --------
+
+New module development
+------------------------
+
+Edit cmd_processor.py and add your module as a method in the Modules() class.
+
+
 
 
 Research
@@ -294,6 +318,29 @@ https://malwareconfig.com/stats/
 Step 4: Automated memory analysis
 ---------------------------------
 
+Step 06: Packing/Entropy check
+---------------------------------
+
+**action:** Calculate the density (entropy) of specific filetypes (exe and dll)
+
+**description:** Files with low entropy than normal (what is normal?) may be packed executables
+which may lead you to potential malware on the system. The tool we select to carry out
+the scan is DensityScout! We will also try standard entropy with python implementation (slower)
+and slightly different than DensityScout and other approaches to detect packing
+Most likely files with "entropy" less than 0.1 (DensityScout) we can bring to the attention of the analyst.
+However in a default Windows installation we can see that there several legitimate files
+below 0.1 . This technique is likely to produce false positives.Here we can use outliers
+
+**references:**
+
+* https://www.cert.at/downloads/software/densityscout_en.html
+* https://github.com/bridgeythegeek/regentropy
+* https://github.com/dchad/malware-detection
+
+
+**feature:** Packing entropy information of extracted files
+
+
 
 .. toctree::
    :maxdepth: 2
@@ -309,6 +356,7 @@ Indices and tables
 
 Module documentation
 ====================
+
 
 .. automodule:: modules.cmd_processor
 .. autoclass:: Modules
