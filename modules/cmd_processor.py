@@ -145,7 +145,3 @@ class Modules():
         ircmd.vol_regdump_module.vol_regdump(cmd_args, GLOBALS)
         return ircmd.vol_regdump_module.get_result()
 
-
-
-
-
