@@ -95,6 +95,7 @@ if __name__ == "__main__":
 
     config.read(settings)
     GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
+    GLOBALS['DUMP_DIR'] = config.get('Directories', 'dump').strip("'")
 
     ##Get module parameters
     action = sys.argv[1]
