@@ -8,19 +8,22 @@ import ConfigParser
 sys.path.append(sys.path[0]+"/../../")
 from modules.db.ops import *
 
-result = {'status': True, 'message': '', 'cmd_results': ''}
+result = {'status': True, 'message': '', 'cmd_results': {}}
 GLOBALS = {}
+
+
+
+##TODO: Create a function to load variables from settings
+# like DBNAME = "results.db"
 
 
 def vol_pslist(image_file, globals_in):
 
-    global GLOBALS
+    global GLOBALS,result
     GLOBALS = globals_in
 
+
     ######TEST AREA
-
-
-
     ######TEST AREA
 
     print_header("Executing vol_pslist...")
@@ -157,7 +160,8 @@ def vol_pslist(image_file, globals_in):
     cmd_array = []
     cmd_array.append('exiftool')
     cmd_array.append('-j')
-    cmd_array.append('/Users/dxl/PycharmProjects/POCArea/irhelper/dump/')
+    cmd_array.append('-q')
+    cmd_array.append(GLOBALS['DUMP_DIR'])
 
     debug(cmd_array)
 
@@ -176,9 +180,7 @@ def vol_pslist(image_file, globals_in):
         result['message'] = "exiftool command failed!"
         err(result['message'])
 
-
     if result['status']:
-        exifout = []
         debug("Loading exiftool results to DB")
 
         jdata = json.loads(cmd_out)
@@ -193,7 +195,6 @@ def vol_pslist(image_file, globals_in):
         for x in jdata_keys:
             table_columns[x] = "text"
 
-
         _table_name = "exiftool"
         rdb = DBOps("results.db")
         rdb.new_table_from_keys(_table_name, table_columns)
@@ -205,6 +206,38 @@ def vol_pslist(image_file, globals_in):
     ##Now run the analyser code
     violations = analyse_processes()
     result['cmd_results'] = violations
+
+
+
+    #enrich_exif_with_shanon_entropy()
+
+
+
+def enrich_exif_with_shanon_entropy():
+    '''
+    The information returned from the exiftool and psinfo contains a lot of
+    information about the extracted files. To have a more complete view of
+    the extracted files we can also add entropy information
+
+    @param: the data dictionary from exiftool
+
+    '''
+    print_header("Calculating entropy of dumped files")
+
+    rdb = DBOps("results.db")
+    rdb.add_column_ifnot_exists('exiftool','sentropy','REAL')
+
+    rows = rdb.get_all_rows('exiftool')
+    for rs in rows:
+        sn = str(calculate_shanon_entropy_file(rs['SourceFile']))
+
+        table_name = "exiftool"
+        column_name = "sentropy"
+        value = sn
+        key_name = "SourceFile"
+        _key = rs['SourceFile']
+        rdb.update_value(table_name, column_name, value, key_name, _key)
+
 
 
 def analyse_processes():
@@ -371,7 +404,7 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys = False, indent = 4))
+    print(json.dumps(in_response, sort_keys=False, indent=4))
 
 
 if __name__ == "__main__":
@@ -387,6 +420,7 @@ if __name__ == "__main__":
 
     config.read(settings)
     GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
+    GLOBALS['DUMP_DIR'] = config.get('Directories', 'dump').strip("'")
 
     ##Get module parameters
     action = sys.argv[1]
@@ -397,8 +431,12 @@ if __name__ == "__main__":
     GLOBALS['_VOLATILITY_PROFILE'] = profile
     GLOBALS['_cache'] = True
     for key in GLOBALS:
-        debug("%s: %s" %(key,GLOBALS[key]))
+        debug("%s: %s" %(key, GLOBALS[key]))
 
     ##Call the actual command
     vol_pslist(image, GLOBALS)
     show_json(get_result())
+
+    d = get_result()
+    print
+    print d['cmd_results']['violations'][0]
