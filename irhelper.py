@@ -14,6 +14,7 @@ GLOBALS['PLUGIN_DIR'] = sys.path[0]+"/vol_plugins/"
 GLOBALS['DUMP_DIR'] = sys.path[0]+"/dump/"
 CACHE_FILE = "/tmp/memoize.pkl"
 DB_NAME = "results.db"
+SETTINGS_FILE = "settings.py"
 
 _VOLATILITY_LOCATION = ""
 
@@ -92,9 +93,8 @@ def run_cmd(command, target_file):
 def main():
 
     ##Load settings.py
-    settings = "settings.py"
     config = ConfigParser.ConfigParser()
-    config.read(settings)
+    config.read(SETTINGS_FILE)
     global GLOBALS
     GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
 
@@ -141,6 +141,7 @@ def main():
     if GLOBALS['_VOLATILITY_PROFILE'] == "":
         for n in range(0, len(profile_array)):
             print("%s) %s" %(n,profile_array[n].strip()))
+        print("If you see only profile names then select a number. If not use the full word")
         choice = raw_input("Please enter profile number or name: ")
         try:
             profile = profile_array[int(choice)].strip()
