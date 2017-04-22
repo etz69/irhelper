@@ -94,6 +94,7 @@ ENV/
 
 # Directories and files  containing analysis results
 dump/*
+!dump/.gitkeep
 results.db
 docs/_build
 docs/_static
