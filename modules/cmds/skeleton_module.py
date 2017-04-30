@@ -1,79 +1,34 @@
-import subprocess
 import json
-import sqlite3
 import sys
-import os
-import ConfigParser
 
 sys.path.append(sys.path[0]+"/../../")
-from modules.db.ops import *
+from modules.utils.helper import *
 
-result = {'status': True, 'message': '', 'cmd_results': ''}
-GLOBALS = {}
-
-
-def skeleton_cmd(image_file, globals_in):
-
-    global GLOBALS
-    GLOBALS = globals_in
-
-    print_header("Executing skeleton command")
+result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
 
 
-    ##Construct the required command
+def skeleton_module(_project):
+    global result
 
-    cmd_array = []
-    cmd_array.append("vol.py")
-    if "_cache" in GLOBALS:
-        cmd_array.append('--cache')
-    cmd_array.append('--profile='+GLOBALS['_VOLATILITY_PROFILE'])
-    if "_KDBG" in GLOBALS:
-        cmd_array.append('--kdbg='+GLOBALS['_KDBG'])
-    cmd_array.append('-f')
-    cmd_array.append(image_file)
-    #The command and the output
-    cmd_array.append('pslist')
-    cmd_array.append('--output=sqlite')
-    cmd_array.append('--output-file=results.db')
+    print_header("Running skeleton command example")
 
-    debug(cmd_array)
+    debug("Project root: [%s]" % _project.get_root())
+    debug("Plugins dir: [%s]" % _project.plugins_dir)
+    debug("Report export dir: [%s]" % _project.report_export_location)
+    debug("Pyplot flag: [%s]" % _project.pyplot_flag)
 
-    ##Run the constructed command
-
-    _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
-
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
-        result['status'] = True
+    rc, result = execute_volatility_plugin(plugin_type="default",
+                                            plugin_name="pslist",
+                                            output="stdout",
+                                            result=result,
+                                            project=_project,
+                                            shell=False,
+                                            dump=False,
+                                            plugin_parms=None)
+    if result['status']:
+        debug("CMD completed")
     else:
-        result['status'] = False
-        result['message'] = "skeleton command failed!"
         err(result['message'])
-
-    result['cmd_results'] = get_data()
-
-
-def get_data():
-
-### This function can be anything which constructs the required cmd response
-### if required to return anything
-
-    con = sqlite3.connect('results.db')
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
-    cur.execute('select * from imageinfo')
-    rows = cur.fetchone()
-    data = {}
-    for key in rows.keys():
-        data[key] = rows[key]
-
-    con.close()
-    return data
 
 
 def get_result():
@@ -82,34 +37,28 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys = False, indent = 4))
+    print(json.dumps(in_response, sort_keys=False, indent=4))
 
 
 if __name__ == "__main__":
-    print("Python version: %s\n " %sys.version)
+    #python modules/cmds/skeleton_module.py sample001.bin
+    print("Python version: %s\n " % sys.version)
 
-    ##When entering via main the paths change
-    GLOBALS = {}
+    DB_NAME = "results.db"
+
     set_debug(True)
 
-    ##Load settings.py
-    settings = sys.path[0]+"/../../settings.py"
-    config = ConfigParser.ConfigParser()
-
-    config.read(settings)
-    GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
-
     ##Get module parameters
-    action = sys.argv[1]
-    image = sys.argv[2]
-    profile = sys.argv[3]
+    image = sys.argv[1]
+    profile = sys.argv[2]
 
-    ##Load required GLOBALS
-    GLOBALS['_VOLATILITY_PROFILE'] = profile
-    GLOBALS['_cache'] = True
-    for key in GLOBALS:
-        debug("%s: %s" %(key,GLOBALS[key]))
 
     ##Call the actual command
-    skeleton_cmd(image, GLOBALS)
+    current_wd = sys.path[0]
+    my_project = Project(current_wd)
+    my_project.init_db(DB_NAME)
+    my_project.set_volatility_profile(profile)
+    my_project.set_image_name(image)
+
+    skeleton_module(my_project)
     show_json(get_result())

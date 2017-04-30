@@ -31,92 +31,76 @@
 ##Pitfalls
 #Related registry keys might not be present in captured memory
 
-import subprocess
 import json
 import sqlite3
 import sys
-import ConfigParser
 
 sys.path.append(sys.path[0]+"/../../")
 from modules.utils.helper import *
 
+result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
 
-result = {'status': True, 'message': '', 'cmd_results': ''}
-GLOBALS = {}
 
-def vol_getosversion(image_file, globals_in):
-
-    global GLOBALS
-    GLOBALS = globals_in
+def vol_getosversion(_project):
+    global result
 
     print_header("Attempting to gather OS version info")
 
     #####Test AREA
-
-
     #####Test AREA
 
     ##We need to use shell as we need to escape reg key chars
+    plugin_parms = "-K 'Microsoft\Windows NT\CurrentVersion'"
 
-    cmd = "vol.py --cache -f "+image_file+\
-          " --profile="+GLOBALS['_VOLATILITY_PROFILE']+\
-          " printkey -K 'Microsoft\Windows NT\CurrentVersion' " \
-          " --output-file=results.db --output=sqlite"
-
-    debug(cmd)
-    _proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
-
-    rc = _proc.poll()
-
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
-        result['status'] = True
+    rc, result = execute_volatility_plugin(plugin_type="default",
+                                            plugin_name="printkey",
+                                            output="db",
+                                            result=result,
+                                            project=_project,
+                                            shell=True,
+                                            dump=False,
+                                            plugin_parms=plugin_parms)
+    if result['status']:
+        debug("CMD completed")
     else:
-        result['status'] = False
-        result['message'] = "printkey command failed!"
         err(result['message'])
 
 
     ##Run custom systeminfo
-    cmd = "vol.py --plugins="+GLOBALS['PLUGIN_DIR']+ \
-          " --cache -f "+image_file+" " \
-          " --profile="+GLOBALS['_VOLATILITY_PROFILE'] + \
-          " systeminfo" +\
-          " --output-file=results.db --output=sqlite"
+    rc, result = execute_volatility_plugin(plugin_type="contrib",
+                                            plugin_name="systeminfo",
+                                            output="db",
+                                            result=result,
+                                            project=_project,
+                                            shell=True,
+                                            dump=False,
+                                            plugin_parms=None)
 
-    debug(cmd)
-    _proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    _proc.wait()
-
-    if _proc.returncode == 0:
-        result['status'] = True
+    if result['status']:
+        debug("CMD completed")
+        result['cmd_results'] = extract_version_info()
     else:
-        result['status'] = False
-        result['message'] = "systeminfo plugin failed!"
+        err("Will not extract version info")
+        #err(result['message'])
 
-    result['cmd_results'] = extract_version_info()
 
 
 def extract_version_info():
 
     con = sqlite3.connect('results.db')
     cur = con.cursor()
-    cur.execute('select Valname,ValData from Printkey where Valname!="-"')
+    cur.execute('SELECT Valname,ValData FROM Printkey WHERE Valname!="-"')
     rows = cur.fetchall()
     data = {}
     for row in rows:
         data[row[0]] = row[1]
 
     try:
-        cur.execute('select summary from systeminfo where'
+        cur.execute('SELECT summary from systeminfo where'
                     ' source like "ComputerName%"')
         row = cur.fetchone()
         data['compname'] = row[0]
-        cur.execute('select summary from systeminfo where'
+        cur.execute('SELECT summary from systeminfo where'
                     ' source like "Domain%"')
         row = cur.fetchone()
         data['domain'] = row[0]
@@ -135,36 +119,27 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys = False, indent = 4))
+    print(json.dumps(in_response, sort_keys=False, indent=4))
 
 
 if __name__ == "__main__":
-    print("Python version: %s\n " %sys.version)
+    #python modules/cmds/vol_getosversion_module.py sample001.bin Win7SP1x64
+    print("Python version: %s\n " % sys.version)
+    DB_NAME = "results.db"
 
-    ##When entering via main the paths change
-    GLOBALS = {}
     set_debug(True)
 
-    ##Load settings.py
-    settings = sys.path[0]+"/../../settings.py"
-    config = ConfigParser.ConfigParser()
-
-    config.read(settings)
-    GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
-
     ##Get module parameters
-    action = sys.argv[1]
-    image = sys.argv[2]
-    profile = sys.argv[3]
-
-    ##Load required GLOBALS
-    GLOBALS['_VOLATILITY_PROFILE'] = profile
-    GLOBALS['_cache'] = True
-    for key in GLOBALS:
-        debug("%s: %s" %(key,GLOBALS[key]))
+    image = sys.argv[1]
+    profile = sys.argv[2]
 
     ##Call the actual command
-    vol_getosversion(image, GLOBALS)
-    show_json(get_result())
+    current_wd = sys.path[0]
+    my_project = Project(current_wd)
+    my_project.init_db(DB_NAME)
+    my_project.set_volatility_profile(profile)
+    my_project.set_image_name(image)
 
+    vol_getosversion(my_project)
+    show_json(get_result())
 

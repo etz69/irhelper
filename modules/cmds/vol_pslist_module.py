@@ -1,100 +1,66 @@
-import subprocess
-import sys
-import json
 import re
 import collections
-import ConfigParser
+import json
+import sys
 
 sys.path.append(sys.path[0]+"/../../")
-from modules.db.ops import *
+from modules.utils.helper import *
+from modules.db import DBops as dbops
 
-result = {'status': True, 'message': '', 'cmd_results': {}}
-GLOBALS = {}
+##TODO remove sqlite and create dbops
+import sqlite3
 
-
-
-##TODO: Create a function to load variables from settings
-# like DBNAME = "results.db"
+result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
 
 
-def vol_pslist(image_file, globals_in):
-
-    global GLOBALS,result
-    GLOBALS = globals_in
-
+def vol_pslist(project):
+    global result
 
     ######TEST AREA
+
     ######TEST AREA
+
 
     print_header("Executing vol_pslist...")
-    cmd_array = []
-    cmd_array.append("vol.py")
-    if "_cache" in GLOBALS:
-        cmd_array.append('--cache')
-    cmd_array.append('--profile='+GLOBALS['_VOLATILITY_PROFILE'])
-    if "_KDBG" in GLOBALS:
-        cmd_array.append('--kdbg='+GLOBALS['_KDBG'])
-    cmd_array.append('-f')
-    cmd_array.append(image_file)
-    #The command and the output
-    cmd_array.append('pslist')
-    cmd_array.append('--output=sqlite')
-    cmd_array.append('--output-file=results.db')
+    rdb = dbops.DBOps(project.db_name)
 
-    debug(cmd_array)
+    if not rdb.table_exists("PSList"):
+        rc, result = execute_volatility_plugin(plugin_type="default",
+                                                plugin_name="pslist",
+                                                output="db",
+                                                result=result,
+                                                project=project,
+                                                shell=False,
+                                                dump=False,
+                                                plugin_parms=None)
 
-    _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    debug("Child process pid: %s" %_proc.pid)
-
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
-        result['status'] = True
-    else:
-        result['status'] = False
-        result['message'] = "pslist command failed!"
-        err(result['message'])
+        if result['status']:
+            debug("CMD completed")
+        else:
+            err(result['message'])
 
     print("Gathering more process info...")
 
-    cmd_array = []
-    cmd_array.append("vol.py")
-    cmd_array.append('--plugins='+GLOBALS['PLUGIN_DIR'])
+    if not rdb.table_exists("psinfo2"):
+        rc, result = execute_volatility_plugin(plugin_type="contrib",
+                                                plugin_name="psinfo2",
+                                                output="stdout",
+                                                result=result,
+                                                project=project,
+                                                shell=False,
+                                                dump=False,
+                                                plugin_parms=None)
 
-    if '_cache' in GLOBALS:
-        cmd_array.append('--cache')
-    if "_KDBG" in GLOBALS:
-        cmd_array.append('--kdbg='+GLOBALS['_KDBG'])
-    cmd_array.append('--profile='+GLOBALS['_VOLATILITY_PROFILE'])
-    cmd_array.append('-f')
-    cmd_array.append(image_file)
-    #The command and the output
-    cmd_array.append('psinfo2')
-
-    debug(cmd_array)
-
-    _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
-
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
-        result['status'] = True
-    else:
-        result['status'] = False
-        result['message'] = "psinfo2 command failed!"
-        err(result['message'])
+        if result['status']:
+            debug("CMD completed")
+        else:
+            err(result['message'])
 
     if result['status']:
+
         processinfo_data = []
 
-        for line in cmd_out.split("\n"):
+        for line in result['cmd_results'].split("\n"):
             try:
                 psinfo_line = line.rstrip("\n").split("|")
                 psinfo = {}
@@ -105,112 +71,165 @@ def vol_pslist(image_file, globals_in):
                 psinfo['imagepath'] = psinfo_line[4]
                 psinfo['cmdline'] = psinfo_line[5].replace(" ","/").split("//")[0].replace("\/\"","|").replace("\"","")
 
+                if psinfo_line[2] == "4":
+                    psinfo['process_fullname'] = "system"
+
                 processinfo_data.append(psinfo.copy())
-            except Exception,e:
+            except Exception, e:
                 err(e)
                 debug(line)
 
         _table_name = "psinfo2"
-        rdb = DBOps("results.db")
+
+        rdb = dbops.DBOps(project.db_name)
         rdb.new_table(_table_name, {'process':'text','process_fullname':'text',
                                   'pid':'integer', 'ppid':'text','imagepath':'text',
                                   'cmdline':'text'})
 
         rdb.insert_into_table(_table_name, processinfo_data)
 
-    cmd = "vol.py verinfo --cache -f "+image_file+\
-          " --profile="+GLOBALS['_VOLATILITY_PROFILE']+\
-          " --output-file=results.db --output=sqlite"
+    if not rdb.table_exists("VerInfo"):
+        rc, result = execute_volatility_plugin(plugin_type="default",
+                                                plugin_name="verinfo",
+                                                output="db",
+                                                result=result,
+                                                project=project,
+                                                shell=False,
+                                                dump=False,
+                                                plugin_parms=None)
+        if result['status']:
+            debug("CMD completed")
+        else:
+            err(result['message'])
 
-    debug(cmd)
-    _proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    _proc.wait()
-
-    if _proc.returncode == 0:
-        result['status'] = True
-    else:
-        result['status'] = False
-        result['message'] = "verinfo plugin failed!"
-        err(result['message'])
 
     ###Dump pslist processes in dump dir and run checks
-
-    cmd = "vol.py procdump --cache -f "+image_file+\
-          " --profile="+GLOBALS['_VOLATILITY_PROFILE']+\
-          " -D dump/"
-
-    _proc = subprocess.Popen(cmd, shell=True,stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
-
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
-        result['status'] = True
-    else:
-        result['status'] = False
-        result['message'] = "procdump command failed!"
-        err(result['message'])
+    rc, result = execute_volatility_plugin(plugin_type="default",
+                                             plugin_name="procdump",
+                                             output="stdout",
+                                             result=result,
+                                             project=project,
+                                             shell=True,
+                                             dump=True,
+                                             plugin_parms=None)
 
     ##Run exiftool and store information
+    if not rdb.table_exists("exiftool"):
 
-    #cmd = "exiftool -j pslist_dump/*"
-    cmd_array = []
-    cmd_array.append('exiftool')
-    cmd_array.append('-j')
-    cmd_array.append('-q')
-    cmd_array.append(GLOBALS['DUMP_DIR'])
+        #cmd = "exiftool -j pslist_dump/*"
+        cmd_array = []
+        cmd_array.append('exiftool')
+        cmd_array.append('-j')
+        cmd_array.append('-q')
+        cmd_array.append(project.dump_dir)
 
-    debug(cmd_array)
+        debug(cmd_array)
+        try:
+            rc = subprocess.check_output(cmd_array)
+            result['status'] = True
+            cmd_out = rc
+        except subprocess.CalledProcessError, e:
+            result['status'] = False
+            result['message'] = "Exception: exiftool plugin failed!"
+            err(result['message'])
 
-    _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
+        if result['status']:
+            debug("Loading exiftool results to DB")
 
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
+            try:
 
-    if _proc.returncode == 0:
-        result['status'] = True
-    else:
-        result['status'] = False
-        result['message'] = "exiftool command failed!"
-        err(result['message'])
+                jdata = json.loads(cmd_out)
+                jdata_keys = []
 
-    if result['status']:
-        debug("Loading exiftool results to DB")
+                for i in jdata:
+                    for n in i.keys():
+                        if n not in jdata_keys:
+                            jdata_keys.append(n)
 
-        jdata = json.loads(cmd_out)
-        jdata_keys = []
+                table_columns = {}
+                for x in jdata_keys:
+                    table_columns[x] = "text"
 
-        for i in jdata:
-            for n in i.keys():
-                if n not in jdata_keys:
-                    jdata_keys.append(n)
+                _table_name = "exiftool"
+                rdb = dbops.DBOps(project.db_name)
+                rdb.new_table_from_keys(_table_name, table_columns)
 
-        table_columns = {}
-        for x in jdata_keys:
-            table_columns[x] = "text"
-
-        _table_name = "exiftool"
-        rdb = DBOps("results.db")
-        rdb.new_table_from_keys(_table_name, table_columns)
-
-        rdb.insert_into_table(_table_name, jdata)
-
-        result['cmd_results'] = "PS info finished"
+                rdb.insert_into_table(_table_name, jdata)
+                result['cmd_results'] = "PS info finished"
+            except Exception,e:
+                err("Error running exiftool")
+                result['errors'].append(e)
 
     ##Now run the analyser code
-    violations = analyse_processes()
-    result['cmd_results'] = violations
+    violations, plist = analyse_processes(project)
+    result['cmd_results'] = {'violations': [], 'plist': [],
+                             'plist_extended': [],
+                             'suspicious_processes': [],}
+
+    result['cmd_results']['plist'] = plist
+    result['cmd_results']['violations'] = violations
+
+    enrich_exif_with_shanon_entropy()
+    calculate_md5()
+
+    epslist_data = enrich_pslist(project, plist)
+    result['cmd_results']['plist_extended'] = epslist_data
 
 
+    risk_list = analyse_scan_processes(project)
+    suspicious_plist = []
+    for p in risk_list:
+        suspicious_process = {}
+        suspicious_process['pid'] = p
+        suspicious_process['risk'] = risk_list[p]
+        for i in plist:
+            if str(i['pid']) ==  str(p):
+                suspicious_process['name'] = i['name']
+                break
+        suspicious_plist.append(suspicious_process.copy())
+    result['cmd_results']['suspicious_processes'] = suspicious_plist
 
-    #enrich_exif_with_shanon_entropy()
 
+def enrich_pslist(project, plist):
+
+    rdb = dbops.DBOps(project.db_name)
+    query = "select FileName,CompanyName,OriginalFileName," \
+            "FileDescription,FileSize,LegalCopyright,FileDescription,md5," \
+            "InternalName,sentropy from exiftool"
+
+    jdata = rdb.sqlite_query_to_json(query)
+
+    for entry in jdata:
+        new_entry = {}
+        pid = entry['FileName'].split(".")[1]
+        entry['pid'] = pid
+        for e in plist:
+            if str(pid) == str(e['pid']):
+                entry['process_name'] = e['name']
+        entry['sn_level'] = check_entropy_level(entry['sentropy'])
+
+    return jdata
+
+
+def calculate_md5():
+    print_header("Calculating MD5 of dumped files. This may take a while")
+
+    rdb = dbops.DBOps("results.db")
+    rdb.patch_table('exiftool','md5','text')
+
+    rows = rdb.get_all_rows('exiftool')
+    for rs in rows:
+        try:
+            md5 = md5sum(rs['SourceFile'])
+            table_name = "exiftool"
+            column_name = "md5"
+            value = str(md5)
+            key_name = "SourceFile"
+            _key = rs[key_name]
+            rdb.update_value(table_name, column_name, value, key_name, _key)
+
+        except Exception, e:
+            err(e)
 
 
 def enrich_exif_with_shanon_entropy():
@@ -222,36 +241,40 @@ def enrich_exif_with_shanon_entropy():
     @param: the data dictionary from exiftool
 
     '''
-    print_header("Calculating entropy of dumped files")
+    print_header("Calculating entropy of dumped files. This may take a while")
+    get_a_cofee()
 
-    rdb = DBOps("results.db")
-    rdb.add_column_ifnot_exists('exiftool','sentropy','REAL')
+    rdb = dbops.DBOps("results.db")
+    rdb.patch_table('exiftool','sentropy','REAL')
 
     rows = rdb.get_all_rows('exiftool')
     for rs in rows:
-        sn = str(calculate_shanon_entropy_file(rs['SourceFile']))
+        try:
+            sn = str(calculate_shanon_entropy_file(rs['SourceFile']))
+            table_name = "exiftool"
+            column_name = "sentropy"
+            value = sn
+            key_name = "SourceFile"
+            _key = rs[key_name]
+            rdb.update_value(table_name, column_name, value, key_name, _key)
 
-        table_name = "exiftool"
-        column_name = "sentropy"
-        value = sn
-        key_name = "SourceFile"
-        _key = rs['SourceFile']
-        rdb.update_value(table_name, column_name, value, key_name, _key)
+        except Exception, e:
+            pass
 
 
 
-def analyse_processes():
+
+def analyse_processes(project):
     '''
     This module will check all running processes to verify that the correct
     parent process has spawned the running one.
-    Some code has been taken from DAMM - Copyright (c) 2013 504ENSICS Labs
+    Some ideas like the rules format has been taken from DAMM - @ 504ENSICS Labs
 
     @param: param
 
     '''
     print_header("Analysing processes")
-    global GLOBALS
-    debug(GLOBALS)
+
 
     violations = []
     violations_count = 0
@@ -296,6 +319,9 @@ def analyse_processes():
     #process_fullname|process    |pid|ppid|imagepath                    |Hnds|Sess|Thds
     #NoPEB           |System     |4  |0   |NoPEB                        |1003|-1  |65
 
+    ##TODO: here we need a more novel approach for the violation checks
+    ## to minimise false positives . Not all information is available sometimes
+
     ##First put all processes from pslist with enriched info into an array
     con = sqlite3.connect('results.db')
     con.row_factory = sqlite3.Row
@@ -320,7 +346,6 @@ def analyse_processes():
             ps['imagepath'] = ''
 
 
-
         ps['ppid'] = rs['ppid']
         ps['parent'] = str(rs['parentname']).lower()
         if rs['ppid'] == "4":
@@ -335,19 +360,21 @@ def analyse_processes():
         target_process_list.append(ps.copy())
         full_pslist_dict[ps['name']] = ps.copy()
 
-    if str(GLOBALS['_VOLATILITY_PROFILE']).startswith("WinXP") or str(GLOBALS['_VOLATILITY_PROFILE']).startswith("Win2003"):
+    if str(project.get_volatility_profile()).startswith("WinXP") \
+            or str(project.get_volatility_profile()).startswith("Win2003"):
         rule_list = known_processes_XP
     else:
         rule_list = known_processes_Vista
 
     for key in rule_list:
         for process in target_process_list:
-            if re.search(process['name'],key, re.IGNORECASE):
+            if re.search(process['name'], key, re.IGNORECASE):
                 for check in rule_list[key]:
                     if check in process:
-                        if not str(process[check]).lower() == str(rule_list[key][check]).lower():
+                        ###NOt all have peb information
+                        if not str(process[check]).lower() == str(rule_list[key][check]).lower() and str(process[check]).lower() != "nopeb" :
 
-                            print("Violation detected on: [%s] Actual value: [%s] Expected value: [%s]" %(check,process[check],rule_list[key][check]))
+                            print("Violation detected on: [%s] Actual value: [%s] Expected value: [%s]" %(check, process[check], rule_list[key][check]))
                             print(process)
                             violations_count += 1
                             violation_message['id'] = violations_count
@@ -397,7 +424,128 @@ def analyse_processes():
                 violation_message['details'] = ("Possible culrpit process detected: [%s] resembles to: [%s] Score: [%s]" %(process,suspect,score))
                 violations.append(violation_message.copy())
 
-    return violations
+    return violations, target_process_list
+
+
+def analyse_scan_processes(_project):
+
+    ## First we retrieve psxview all processes
+    global result
+    print_header("Gathering information from scan process")
+
+    rdb = dbops.DBOps(_project.db_name)
+    if not rdb.table_exists("PsXview"):
+        rc, result = execute_volatility_plugin(plugin_type="contrib",
+                                                plugin_name="psxview",
+                                                output="db",
+                                                result=result,
+                                                project=_project,
+                                                shell=False,
+                                                dump=False,
+                                                plugin_parms=None)
+
+        if result['status']:
+            debug("CMD completed")
+        else:
+            err(result['message'])
+
+    if not rdb.table_exists("ApiHooks"):
+        rc, result = execute_volatility_plugin(plugin_type="contrib",
+                                                plugin_name="apihooks",
+                                                output="db",
+                                                result=result,
+                                                project=_project,
+                                                shell=False,
+                                                dump=False,
+                                                plugin_parms=None)
+
+        if result['status']:
+            debug("CMD completed")
+        else:
+            err(result['message'])
+
+    if not rdb.table_exists("Malfind"):
+        rc, result = execute_volatility_plugin(plugin_type="contrib",
+                                                plugin_name="malfind",
+                                                output="db",
+                                                result=result,
+                                                project=_project,
+                                                shell=False,
+                                                dump=False,
+                                                plugin_parms=None)
+
+        if result['status']:
+            debug("CMD completed")
+        else:
+            err(result['message'])
+
+
+    ##Three arrays
+    psxview = []
+    apihooked = []
+    malfinded = []
+    process_risk = {}
+
+    ## Analyse further the ones with PID=false psscan=True and ExitTime null
+    #select * from psxview where pslist="False" and psscan="True" and exittime="";
+    if rdb.table_exists("PsXview"):
+        jdata = {}
+        #query = 'select * from psxview where pslist=\"False\"' \
+        #        ' and psscan=\"True\" and not ExitTime '
+        query = "select * from psxview where psscan=\"True\""
+
+        jdata = rdb.sqlite_query_to_json(query)
+        for entry in jdata:
+
+            psxview.append(entry['PID'])
+            process_risk[entry['PID']] = 1
+    else:
+        err("No PSXView data")
+
+
+    if rdb.table_exists("ApiHooks"):
+        jdata = {}
+        query = "select PID, Process, VictimModule, Function from ApiHooks"
+        jdata = rdb.sqlite_query_to_json(query)
+        for entry in jdata:
+            apihooked.append(entry['PID'])
+            if entry['PID'] in psxview:
+                process_risk[entry['PID']] = 2
+            else:
+                process_risk[entry['PID']] = 1
+
+    else:
+        err("No ApiHooks data")
+
+
+    if rdb.table_exists("Malfind"):
+        jdata = {}
+        query = "select Pid, Process from Malfind group by Pid"
+        jdata = rdb.sqlite_query_to_json(query)
+        for entry in jdata:
+            malfinded.append(entry['Pid'])
+            if entry['Pid'] in apihooked and entry['Pid'] in psxview:
+                process_risk[entry['Pid']] = 3
+            if entry['Pid'] in apihooked and entry['Pid'] not in psxview:
+                process_risk[entry['Pid']] = 2
+            if entry['Pid'] not in apihooked and entry['Pid'] in psxview:
+                process_risk[entry['Pid']] = 2
+
+    else:
+        err("No Malfind data")
+
+
+    ##Then for every process from above check the following :
+    #1. apihooks
+    #2. malfind
+    # more to come this is just a very simple approach (there will be false positives as well
+    ##Finally we assign a risk score:
+    # 10 to the ones from psscan
+    # 10 to the ones from apihooks
+    # 10 to the ones in malfind (next version we identify shellcode with ML ! :)
+
+    debug("Process risk list:%s " %process_risk)
+    return process_risk
 
 def get_result():
     return result
@@ -406,37 +554,23 @@ def show_json(in_response):
     ##Function to test json output
     print(json.dumps(in_response, sort_keys=False, indent=4))
 
-
 if __name__ == "__main__":
+    #
     print("Python version: %s\n " %sys.version)
+    DB_NAME = "results.db"
 
-    ##When entering via main the paths change
-    GLOBALS = {}
     set_debug(True)
 
-    ##Load settings.py
-    settings = sys.path[0]+"/../../settings.py"
-    config = ConfigParser.ConfigParser()
-
-    config.read(settings)
-    GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
-    GLOBALS['DUMP_DIR'] = config.get('Directories', 'dump').strip("'")
-
     ##Get module parameters
-    action = sys.argv[1]
-    image = sys.argv[2]
-    profile = sys.argv[3]
-
-    ##Load required GLOBALS
-    GLOBALS['_VOLATILITY_PROFILE'] = profile
-    GLOBALS['_cache'] = True
-    for key in GLOBALS:
-        debug("%s: %s" %(key, GLOBALS[key]))
+    image = sys.argv[1]
+    profile = sys.argv[2]
 
     ##Call the actual command
-    vol_pslist(image, GLOBALS)
-    show_json(get_result())
+    current_wd = sys.path[0]
+    project = Project(current_wd)
+    project.init_db(DB_NAME)
+    project.set_volatility_profile(profile)
+    project.set_image_name(image)
 
-    d = get_result()
-    print
-    print d['cmd_results']['violations'][0]
+    vol_pslist(project)
+    show_json(get_result())

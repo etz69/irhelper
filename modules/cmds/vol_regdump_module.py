@@ -1,62 +1,73 @@
+import re
 import subprocess
 import json
-import sqlite3
 import sys
-import os
-import re
-import ConfigParser
 
 sys.path.append(sys.path[0]+"/../../")
-from modules.db.ops import *
+from modules.utils.helper import *
 from modules.utils import samparser
 
-result = {'status': True, 'message': '', 'cmd_results': ''}
-GLOBALS = {}
+
+result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
+###TODO: Remove sqlite3
+import sqlite3
 
 
-def vol_regdump(image_file, globals_in):
-
-    global GLOBALS
-    GLOBALS = globals_in
+def vol_regdump(project):
 
     print_header("Executing vol_regdump command")
 
 
     ##Construct the required command
     ##First we need to find if the SAM is in memory
+    debug(project.dump_dir)
 
     cmd_array = []
     cmd_array.append("vol.py")
-    if "_cache" in GLOBALS:
-        cmd_array.append('--cache')
-    cmd_array.append('--profile='+GLOBALS['_VOLATILITY_PROFILE'])
-    if "_KDBG" in GLOBALS:
-        cmd_array.append('--kdbg='+GLOBALS['_KDBG'])
+    cmd_array.append('--cache')
+    cmd_array.append('--profile='+project.get_volatility_profile())
+    if project.image_kdgb != "":
+        cmd_array.append('--kdbg='+project.image_kdgb)
     cmd_array.append('-f')
-    cmd_array.append(image_file)
+    cmd_array.append(project.image_name)
     #The command and the output
     cmd_array.append('hivelist')
     cmd_array.append('--output=sqlite')
-    cmd_array.append('--output-file=results.db')
+    cmd_array.append('--output-file='+project.db_name)
 
     debug(cmd_array)
 
     ##Run the constructed command
 
-    _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
+    rc = subprocess.call(cmd_array)
 
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
+    if rc == 0:
         result['status'] = True
     else:
         result['status'] = False
         result['message'] = "hivelist command failed!"
         err(result['message'])
+
+
+
+    # _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
+    # debug("Child process pid: %s"%_proc.pid)
+    #
+    # rc = _proc.poll()
+    # debug(rc)
+    # while rc is not None:
+    #     debug("Sec:%s"%rc)
+    #     cmd_out =_proc.stdout.read()
+    #     rc = _proc.poll()
+    # debug("Third:%s"%rc)
+    # debug("Return:%s"%_proc.returncode)
+    #
+    # if _proc.returncode == 0:
+    #     result['status'] = True
+    # else:
+    #     result['status'] = False
+    #     result['message'] = "hivelist command failed!"
+    #     err(result['message'])
 
     reg_info = get_sam_offset()
     ##now lets dump the registry from mem
@@ -65,56 +76,69 @@ def vol_regdump(image_file, globals_in):
 
     cmd_array = []
     cmd_array.append("vol.py")
-    if "_cache" in GLOBALS:
-        cmd_array.append('--cache')
-    cmd_array.append('--profile='+GLOBALS['_VOLATILITY_PROFILE'])
-    if "_KDBG" in GLOBALS:
-        cmd_array.append('--kdbg='+GLOBALS['_KDBG'])
+    cmd_array.append('--cache')
+    cmd_array.append('--profile='+project.get_volatility_profile())
+    if project.image_kdgb != "":
+        cmd_array.append('--kdbg='+project.image_kdgb)
+
     cmd_array.append('-f')
-    cmd_array.append(image_file)
+    cmd_array.append(project.image_name)
     #The command and the output
     cmd_array.append('dumpregistry')
     cmd_array.append('-o')
     cmd_array.append(reg_info['offset'])
     cmd_array.append('-D')
-    cmd_array.append(GLOBALS['DUMP_DIR'])
+    cmd_array.append(project.dump_dir)
 
     debug(cmd_array)
 
     ##Run the constructed command
-
-    _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    debug("Child process pid: %s"%_proc.pid)
-
-    rc = _proc.poll()
-    while rc == None:
-        cmd_out =_proc.stdout.read()
-        rc = _proc.poll()
-
-    if _proc.returncode == 0:
+    cmd_out = ""
+    reg_file = ""
+    try:
+        rc = subprocess.check_output(cmd_array)
         result['status'] = True
-    else:
+        cmd_out = rc
+    except subprocess.CalledProcessError, e:
         result['status'] = False
-        result['message'] = "dumpregistry command failed!"
+        result['message'] = "Exception: dumpregistry command failed!"
         err(result['message'])
+
+
+    # _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
+    # debug("Child process pid: %s"%_proc.pid)
+    #
+    # rc = _proc.poll()
+    # while rc is None:
+    #     cmd_out =_proc.stdout.read()
+    #     rc = _proc.poll()
+    #
+    # if _proc.returncode is None:
+    #     result['status'] = True
+    # else:
+    #     result['status'] = False
+    #     result['message'] = "dumpregistry command failed!"
+    #     err(result['message'])
 
     debug(cmd_out)
 
-
-    matchObj = re.findall(r":\sregistry.*.reg", str(cmd_out), flags=0)
-    reg_file = ""
-    try:
-        reg_file = matchObj[0].strip(": ")
-        debug(matchObj[0].strip(": "))
-    except Exception,e:
-        result['message'] = "Could not extract SAM registry"
+    if cmd_out != "":
+        matchObj = re.findall(r":\sregistry.*.reg", str(cmd_out), flags=0)
+        reg_file = ""
+        try:
+            reg_file = matchObj[0].strip(": ")
+            debug(matchObj[0].strip(": "))
+        except Exception,e:
+            result['message'] = "Could not extract SAM registry"
 
     if reg_file != "":
-        j = samparser.main(GLOBALS['DUMP_DIR']+reg_file,"json")
+        j = samparser.main(project.dump_dir+reg_file,"json")
 
         #debug(j)
         debug("Run samparser")
         result['cmd_results'] = j
+    else:
+        err("Could not run samparser")
 
 
 
@@ -141,35 +165,25 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys = False, indent = 4))
-
+    print(json.dumps(in_response, sort_keys=False, indent=4))
 
 if __name__ == "__main__":
+    #python modules/cmds/vol_regdump_module.py sample001.raw Win7SP1x64
     print("Python version: %s\n " %sys.version)
+    DB_NAME = "results.db"
 
-    ##When entering via main the paths change
-    GLOBALS = {}
     set_debug(True)
 
-    ##Load settings.py
-    settings = sys.path[0]+"/../../settings.py"
-    config = ConfigParser.ConfigParser()
-
-    config.read(settings)
-    GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
-    GLOBALS['DUMP_DIR'] = config.get('Directories', 'dump').strip("'")
-
     ##Get module parameters
-    action = sys.argv[1]
-    image = sys.argv[2]
-    profile = sys.argv[3]
-
-    ##Load required GLOBALS
-    GLOBALS['_VOLATILITY_PROFILE'] = profile
-    GLOBALS['_cache'] = True
-    for key in GLOBALS:
-        debug("%s: %s" %(key,GLOBALS[key]))
+    image = sys.argv[1]
+    profile = sys.argv[2]
 
     ##Call the actual command
-    vol_regdump(image, GLOBALS)
+    current_wd = sys.path[0]
+    project = Project(current_wd)
+    project.init_db(DB_NAME)
+    project.set_volatility_profile(profile)
+    project.set_image_name(image)
+
+    vol_regdump(project)
     show_json(get_result())

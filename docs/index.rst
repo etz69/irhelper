@@ -4,9 +4,10 @@
    contain the root `toctree` directive.
 
 About (work in progress)
-=========================
+==========================
 
 A play POC tool for first quick analysis of memory images for fun and learning!
+
 
 IRHelper is meant to be a simple tool for automating as much as possible
 the tasks an analyst would perform when acquiring a memory dump. It was
@@ -89,7 +90,8 @@ However for the novice user it does come with some drawbacks.
 * Different OS versions require from the user to know by heart many OS internals
 
 Similar tools
--------------
+--------------
+
 * Volutility
 * Evolve
 * DAMM
@@ -119,6 +121,8 @@ Other tools are used such as:
 * Exiftool
 * ClamAV
 * RegRipper
+
+Note: You might encounter problems with matplotlib. In which case disable from the settings file.
 
 
 
@@ -170,9 +174,8 @@ Run
 
 To run irhelper just point to the image you want to analyse::
 
-    python irhelper.py --initdb --debug templates/report.html image_samples/win7-64-nfury-memory-raw.001
+    python irhelper.py --initdb --debug templates/report.html image_samples/conficker.img
     DEBUG: Cleaning DB file
-    No profile provided I will prompt you soldier!
     No cache, normal run
 
     -------------------------------------
@@ -191,8 +194,8 @@ To run irhelper just point to the image you want to analyse::
     Image local date and time: 2012-04-06 17:28:39 -0400
     PAE type: No PAE
     Image Type (Service Pack): 1
-    Suggested Profile(s): Win7SP0x64, Win7SP1x64, Win2008R2SP0x64, Win2008R2SP1x64
-    AS Layer2: FileAddressSpace (irhelper/image_samples/win7-64-nfury-memory-raw.001)
+    Suggested Profile(s): WinXPSP2x86, WinXPSP3x86 (Instantiated with WinXPSP2x86)
+    AS Layer2: FileAddressSpace (irhelper/image_samples/conficker.img)
     -------------------------------------
 
     0) Win7SP0x64
@@ -227,20 +230,20 @@ Development
 
 You can also run each module on its own while testing::
 
-    python modules/cmds/vol_imageinfo_module.py run image_samples/win7-64-nfury-memory-raw.001 Win7SP1x64
+    python modules/cmds/vol_imageinfo_module.py run image_samples/conficker.img WinXPSP3x86
 
     Python version: 2.7.10 (default, Oct 23 2015, 19:19:21)
     [GCC 4.2.1 Compatible Apple LLVM 7.0.0 (clang-700.0.59.5)]
 
     DEBUG: _cache: True
     DEBUG: PLUGIN_DIR: /tmp/irhelper/vol_plugins/
-    DEBUG: _VOLATILITY_PROFILE: Win7SP1x64
+    DEBUG: _VOLATILITY_PROFILE: WinXPSP3x86
 
     -------------------------------------
     Gathering image initial information
     -------------------------------------
 
-    DEBUG: ['vol.py', '--cache', '-f', 'image_samples/win7-64-nfury-memory-raw.001', 'imageinfo', '--output=sqlite', '--output-file=results.db']
+    DEBUG: ['vol.py', '--cache', '-f', 'image_samples/conficker.img', 'imageinfo', '--output=sqlite', '--output-file=results.db']
     DEBUG: Child process pid: 38001
     Volatility Foundation Volatility Framework 2.5
     {
@@ -258,8 +261,8 @@ You can also run each module on its own while testing::
             "Image local date and time": "2012-04-06 17:28:39 -0400",
             "PAE type": "No PAE",
             "Image Type (Service Pack)": "1",
-            "Suggested Profile(s)": "Win7SP0x64, Win7SP1x64, Win2008R2SP0x64, Win2008R2SP1x64",
-            "AS Layer2": "FileAddressSpace (/tmp/irhelper/image_samples/win7-64-nfury-memory-raw.001)"
+            "Suggested Profile(s)": "WinXPSP2x86, WinXPSP3x86 (Instantiated with WinXPSP2x86)",
+            "AS Layer2": "FileAddressSpace (/tmp/irhelper/image_samples/conficker.img)"
         }
     }
 
@@ -268,7 +271,7 @@ You can also run each module on its own while testing::
 Logging
 -------
 
-For logging purposes there are two methods used::
+For logging purposes there are three methods used::
 
     debug()
     err()
@@ -279,12 +282,14 @@ And the standard print!
 Database
 --------
 
+Various DB (sqlite) utils can be found in the modules.db.DBops
+
 New module development
 ------------------------
 
-Edit cmd_processor.py and add your module as a method in the Modules() class.
-
-
+Edit cmd_processor.py and add your module as a method in the Modules() class. For example
+you can follow the skeleton module. All you have to do is return the standard result dict
+and create the appropriate section in jinja style (and bootstrap) in the templates/report.html file.
 
 
 Research
@@ -293,30 +298,49 @@ Research
 Step 1: Prep evidence and data reduction
 -----------------------------------------
 
-action: Hash lists from NSRL
-description: Download known MD5 hashes from NSRL for minimizing the false positives
-https://www.nsrl.nist.gov/Downloads.htm
-http://nsrlquery.sourceforge.net
-references: -
-feature: -
+**action:** Hash lists from NSRL
+**description:** Download known MD5 hashes from NSRL for minimizing the false positives
+**references:**
 
-Step 2: AV Checks
+* https://www.nsrl.nist.gov/Downloads.htm
+* http://nsrlquery.sourceforge.net
+
+**feature:**
+
+Step 02: AV Checks
 ------------------------
 
-action: Run AV scans
-description: Run AV scan on extracted executables and dlls
-references: -
-feature: -
+**action:** Run AV scans
+**description:** Run AV scan on extracted executables and dlls. Download yara rules
+and search on the different memory artifacts. ClamAv also supports yara
+**references:**
 
 
-Step 3: IOC search
+**feature:**
+
+
+Step 03: IOC search
 ------------------------
+**action:** Search for IOCs
+**description:** Download yara rules and search on the different memory
+artifacts. ClamAv also supports yara
+**references:**
 
-https://github.com/Yara-Rules/rules
-https://malwareconfig.com/stats/
+* https://github.com/Yara-Rules/rules
+* https://malwareconfig.com/stats/
 
-Step 4: Automated memory analysis
----------------------------------
+**feature:**
+
+
+Step 04: Automated memory analysis
+------------------------------------
+
+**action:** Automate daunting tasks for memory analysis
+**description:** Currently this is work in progress
+**references:**
+
+
+**feature:**
 
 Step 06: Packing/Entropy check
 ---------------------------------
@@ -341,7 +365,6 @@ below 0.1 . This technique is likely to produce false positives.Here we can use 
 **feature:** Packing entropy information of extracted files
 
 
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -358,10 +381,17 @@ Module documentation
 ====================
 
 
+.. automodule:: modules.utils.helper
+.. autoclass:: Project
+    :members:
+
 .. automodule:: modules.cmd_processor
+.. autoclass:: CommandProcessor
 .. autoclass:: Modules
     :members:
 
-.. automodule:: modules.db.ops
+
+
+.. automodule:: modules.db.DBops
 .. autoclass:: DBOps
     :members:
