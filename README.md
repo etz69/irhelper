@@ -18,6 +18,8 @@ pip install -r requirements.txt
 vi settings.py
 Edit all locations with the full path of your irhelper installation
 
+Note: if the matplotlib is not working disable in the settings.py file
+
 And Play !
 python irhelper.py --initdb --debug templates/report.html sample001.bin
 

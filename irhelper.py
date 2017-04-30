@@ -1,18 +1,22 @@
 import pickle
 import argparse
 from jinja2 import Environment, FileSystemLoader
-import ConfigParser
 
-from modules.db.ops import *
+
 from modules import cmd_processor
+from modules.utils.helper import *
+import sys
+import os
 
 GLOBALS = {}
-GLOBALS['_VOLATILITY_PROFILE'] = ""
+
 GLOBALS['_KDBG'] = ""
 GLOBALS['_cache'] = True
-GLOBALS['PLUGIN_DIR'] = sys.path[0]+"/vol_plugins/"
-GLOBALS['DUMP_DIR'] = sys.path[0]+"/dump/"
+#GLOBALS['PLUGIN_DIR'] = sys.path[0]+"/vol_plugins/"
+#GLOBALS['DUMP_DIR'] = sys.path[0]+"/dump/"
 CACHE_FILE = "/tmp/memoize.pkl"
+
+
 DB_NAME = "results.db"
 SETTINGS_FILE = "settings.py"
 
@@ -47,6 +51,9 @@ parser.add_argument("-v", '--version', action="version",
 args = parser.parse_args()
 
 from functools import wraps
+
+##EXPERIMENTAL!
+
 def memoize(func):
     if os.path.exists(CACHE_FILE) and args.cache:
         print 'Using local cache ..'
@@ -56,31 +63,38 @@ def memoize(func):
         cache = {}
     @wraps(func)
     def wrap(*args):
-        if args not in cache:
+
+        prj = args[1]
+        cache_key = args[0]+prj.image_name
+
+        if cache_key not in cache:
             print 'No cache, normal run'
-            cache[args] = func(*args)
-            if cache[args]['status']:
-                # update the cache file
+            cache[cache_key] = func(*args)
+
+            with open(CACHE_FILE, 'wb') as f:
+                    pickle.dump(cache, f)
+
+            if cache[cache_key]['status']:
+                 # update the cache file
                 with open(CACHE_FILE, 'wb') as f:
                     pickle.dump(cache, f)
             else:
-                pass
+                debug("Will not cache. Error found")
         else:
             debug("Loading results from cache")
-            print(args)
-        return cache[args]
+
+        return cache[cache_key]
     return wrap
 
-
 @memoize
-def run_cmd(command, target_file):
+def run_cmd(command, project):
 
     cmdp = cmd_processor.CommandProcessor()
     #print("\nSupported Commands:")
     #for cmd in cmdp.get_commands():
     #    print cmd
     debug("Running cmd: %s" %command)
-    response = cmdp.prep_cmd(command, target_file, GLOBALS)
+    response = cmdp.prep_cmd(cmd_name=command, project=project)
     if not response['status']:
         err(response['message'])
     else:
@@ -92,19 +106,8 @@ def run_cmd(command, target_file):
 
 def main():
 
-    ##Load settings.py
-    config = ConfigParser.ConfigParser()
-    config.read(SETTINGS_FILE)
-    global GLOBALS
-    GLOBALS['PLUGIN_DIR'] = config.get('Directories', 'plugins').strip("'")
-
-    ##Initialise our database
-    rdb = DBOps(DB_NAME)
-
     if args.debug:
         set_debug(True)
-    if args.initdb:
-        rdb.clean_db(DB_NAME)
 
     if not os.path.isfile(args.reportTemplate):
         print("ERROR: Report template not found: %s" % args.reportTemplate)
@@ -112,52 +115,73 @@ def main():
     if not os.path.isfile(args.memoryImageFile):
         print("ERROR: Memory image file not found: %s" % args.memoryImageFile)
         return
-    if args.profile:
-        GLOBALS['_VOLATILITY_PROFILE'] = args.profile
-        debug("Using %s" %GLOBALS['_VOLATILITY_PROFILE'])
-    else:
-        print("No profile provided")
 
     if args.hash:
+        debug("Generating image hash")
         md5 = md5sum(args.memoryImageFile)
         debug("MD5:%s" %md5)
     else:
         md5 = "NONE"
 
-    response = run_cmd("vol_imageinfo", args.memoryImageFile)
+    current_wd = sys.path[0]
+    project = Project(current_wd)
+    project.init_db(DB_NAME)
+    project.set_image_name(args.memoryImageFile)
+
+    if args.profile:
+        project.set_volatility_profile(args.profile)
+        debug("Using %s" % project.get_volatility_profile())
+    else:
+        print("No profile provided")
+
+    if args.initdb:
+        project.clean_db()
+
+    debug("Loaded project settings")
+
+    debug("Project root: [%s]" % project.get_root())
+    debug("Plugins dir: [%s]" % project.plugins_dir)
+    debug("Report export dir: [%s]" % project.report_export_location)
+    debug("Pyplot flag: [%s]" % project.pyplot_flag)
+
+    response = run_cmd("vol_imageinfo", project)
 
     if not response['status']:
         err(response['message'])
+        #Fatal cannot continue
         exit()
 
     image_info = response['cmd_results']
     print_cmd_results(image_info)
 
     ##Set global target image values
-    GLOBALS['_KDBG'] = image_info['KDBG']
-    image_info['image_name'] = args.memoryImageFile
+    project.set_image_kdgb(image_info['KDBG'])
+    image_info['image_name'] = project.get_image_name()
     profile_array = image_info['Suggested Profile(s)'].split(",")
 
-    if GLOBALS['_VOLATILITY_PROFILE'] == "":
+    if project.get_volatility_profile() == "":
         for n in range(0, len(profile_array)):
-            print("%s) %s" %(n,profile_array[n].strip()))
+            print("%s) %s" %(n, profile_array[n].strip()))
         print("If you see only profile names then select a number. If not use the full word")
         choice = raw_input("Please enter profile number or name: ")
         try:
             profile = profile_array[int(choice)].strip()
-        except Exception,e:
+        except Exception, e:
             profile = choice
 
-        GLOBALS['_VOLATILITY_PROFILE'] = profile
+        project.set_volatility_profile(profile)
     else:
-        profile = GLOBALS['_VOLATILITY_PROFILE']
+        profile = project.get_volatility_profile()
 
+    if choice == "":
+        err("No profile selected")
+        exit()
 
-    print("\nWill be using profile: %s" % profile)
+    print("\nWill be using profile: %s" % project.get_volatility_profile())
 
     ##### Basic image info retrieved #####
 
-    response = run_cmd("vol_getosversion",args.memoryImageFile)
+    response = run_cmd("vol_getosversion", project)
 
     if not response['status']:
         err(response['message'])
@@ -165,19 +189,35 @@ def main():
     else:
         version_info = response['cmd_results']
 
-    response = run_cmd("vol_netscan", args.memoryImageFile)
+    response = run_cmd("vol_pslist", project)
     if not response['status']:
         err(response['message'])
+    rule_violations = response['cmd_results']['violations']
+    plist = response['cmd_results']['plist']
+    eplist = response['cmd_results']['plist_extended']
+    suspicious_plist = response['cmd_results']['suspicious_processes']
 
-    response = run_cmd("vol_pslist", args.memoryImageFile)
+
+    response = run_cmd("vol_malfind_extend", project)
     if not response['status']:
         err(response['message'])
-    rule_violations = response['cmd_results']
+    malprocesses = response['cmd_results']
 
-    response = run_cmd("vol_regdump", args.memoryImageFile)
+
+    response = run_cmd("vol_regdump", project)
     if not response['status']:
         err(response['message'])
     user_info = response['cmd_results']
+
+    response = run_cmd("vol_netscan", project)
+    if not response['status']:
+        err(response['message'])
+
+    if 'network' not in response['cmd_results']:
+        network_info = {}
+    else:
+        network_info = response['cmd_results']['network']
+
 
     ##Write to template
     if not os.path.exists("export"):
@@ -194,7 +234,13 @@ def main():
         image_md5=md5,
         version_info=version_info,
         rule_violations=rule_violations,
-        users=user_info
+        malprocesses = malprocesses,
+        plist=plist,
+        eplist=eplist,
+        suspicious_plist=suspicious_plist,
+        users=user_info,
+        network_info=network_info
+
     )
     debug("Writing report ..")
     fo.write(mytemplate.encode('utf-8'))
