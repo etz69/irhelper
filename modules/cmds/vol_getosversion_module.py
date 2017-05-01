@@ -105,7 +105,7 @@ def extract_version_info():
         row = cur.fetchone()
         data['domain'] = row[0]
 
-    except Exception, e:
+    except Exception as e:
         err(e)
 
     con.close()

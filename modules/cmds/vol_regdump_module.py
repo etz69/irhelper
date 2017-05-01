@@ -49,26 +49,6 @@ def vol_regdump(project):
         err(result['message'])
 
 
-
-    # _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    # debug("Child process pid: %s"%_proc.pid)
-    #
-    # rc = _proc.poll()
-    # debug(rc)
-    # while rc is not None:
-    #     debug("Sec:%s"%rc)
-    #     cmd_out =_proc.stdout.read()
-    #     rc = _proc.poll()
-    # debug("Third:%s"%rc)
-    # debug("Return:%s"%_proc.returncode)
-    #
-    # if _proc.returncode == 0:
-    #     result['status'] = True
-    # else:
-    #     result['status'] = False
-    #     result['message'] = "hivelist command failed!"
-    #     err(result['message'])
-
     reg_info = get_sam_offset()
     ##now lets dump the registry from mem
     ##Construct the required command
@@ -99,26 +79,10 @@ def vol_regdump(project):
         rc = subprocess.check_output(cmd_array)
         result['status'] = True
         cmd_out = rc
-    except subprocess.CalledProcessError, e:
+    except subprocess.CalledProcessError as e:
         result['status'] = False
         result['message'] = "Exception: dumpregistry command failed!"
         err(result['message'])
-
-
-    # _proc = subprocess.Popen(cmd_array, stdout=subprocess.PIPE)
-    # debug("Child process pid: %s"%_proc.pid)
-    #
-    # rc = _proc.poll()
-    # while rc is None:
-    #     cmd_out =_proc.stdout.read()
-    #     rc = _proc.poll()
-    #
-    # if _proc.returncode is None:
-    #     result['status'] = True
-    # else:
-    #     result['status'] = False
-    #     result['message'] = "dumpregistry command failed!"
-    #     err(result['message'])
 
     debug(cmd_out)
 
@@ -128,13 +92,12 @@ def vol_regdump(project):
         try:
             reg_file = matchObj[0].strip(": ")
             debug(matchObj[0].strip(": "))
-        except Exception,e:
+        except Exception as e:
             result['message'] = "Could not extract SAM registry"
 
     if reg_file != "":
         j = samparser.main(project.dump_dir+reg_file,"json")
 
-        #debug(j)
         debug("Run samparser")
         result['cmd_results'] = j
     else:
