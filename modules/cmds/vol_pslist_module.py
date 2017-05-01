@@ -128,7 +128,7 @@ def vol_pslist(project):
             rc = subprocess.check_output(cmd_array)
             result['status'] = True
             cmd_out = rc
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError as e:
             result['status'] = False
             result['message'] = "Exception: exiftool plugin failed!"
             err(result['message'])
@@ -156,7 +156,7 @@ def vol_pslist(project):
 
                 rdb.insert_into_table(_table_name, jdata)
                 result['cmd_results'] = "PS info finished"
-            except Exception,e:
+            except Exception as e:
                 err("Error running exiftool")
                 result['errors'].append(e)
 
@@ -228,7 +228,7 @@ def calculate_md5():
             _key = rs[key_name]
             rdb.update_value(table_name, column_name, value, key_name, _key)
 
-        except Exception, e:
+        except Exception as e:
             err(e)
 
 
@@ -258,7 +258,7 @@ def enrich_exif_with_shanon_entropy():
             _key = rs[key_name]
             rdb.update_value(table_name, column_name, value, key_name, _key)
 
-        except Exception, e:
+        except Exception as e:
             pass
 
 

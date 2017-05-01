@@ -56,7 +56,7 @@ from functools import wraps
 
 def memoize(func):
     if os.path.exists(CACHE_FILE) and args.cache:
-        print 'Using local cache ..'
+        debug("Using local cache ..")
         with open(CACHE_FILE) as f:
             cache = pickle.load(f)
     else:

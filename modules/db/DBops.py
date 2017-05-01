@@ -93,7 +93,7 @@ class DBOps():
         try:
             c = self.conn.cursor()
             c.execute(sql)
-        except Exception, e:
+        except Exception as e:
             pass
 
 

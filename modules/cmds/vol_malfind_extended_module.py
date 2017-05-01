@@ -50,7 +50,6 @@ def vol_malfind_extended(_project):
         for idx, elem in enumerate(sections):
 
             if idx == (len(sections)-1):
-                print "Breaking"
                 running = False
                 break;
             thiselem = elem
