@@ -1,6 +1,8 @@
 # irhelper
 A play POC tool for initial quick analysis of memory images for fun and learning!
 
+[![Code Climate](https://codeclimate.com/github/etz69/irhelper/badges/gpa.svg)](https://codeclimate.com/github/etz69/irhelper)
+
 Quick install
 ---
 External prerequsites:
