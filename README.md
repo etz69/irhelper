@@ -1,5 +1,10 @@
 # irhelper
 A play POC tool for initial quick analysis of memory images for fun and learning!
+A great way to learn:
+
+* Python :)
+* Volatility (either scripting or at some point you will need to write a plugin !)
+* Memory forensics
 
 [![Code Climate](https://codeclimate.com/github/etz69/irhelper/badges/gpa.svg)](https://codeclimate.com/github/etz69/irhelper)
 
