@@ -55,9 +55,10 @@ def print_header(msg):
 
 
 def print_cmd_results(data):
+
     print("\n-------------------------------------")
     for k in data:
-        print("%s:\t %s" % (k, data[k]))
+        print("%s: %s" % (k, data[k]))
     print("-------------------------------------\n")
 
 
@@ -160,7 +161,7 @@ def valid_ip(input_string):
         if ip_type == "PUBLIC":
             return True, "PUBLIC"
 
-    return False,False
+    return False, False
 
 
 def execute_volatility_plugin(plugin_type, plugin_name,
@@ -362,9 +363,6 @@ class Project():
         self.volatility_profile = profile
 
     def get_volatility_profile(self):
-        #if self.volatility_profile == "":
-        #    raise ValueError("Volatility Profile not defined")
-        #else:
         return self.volatility_profile
 
     def set_image_kdgb(self, location):

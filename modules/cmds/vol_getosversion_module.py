@@ -48,41 +48,41 @@ def vol_getosversion(_project):
 
     #####Test AREA
     #####Test AREA
+    rdb = dbops.DBOps(_project.db_name)
 
-    ##We need to use shell as we need to escape reg key chars
-    plugin_parms = "-K 'Microsoft\Windows NT\CurrentVersion'"
+    vp_plugin_parms = "-K 'Microsoft\Windows NT\CurrentVersion'"
+    vp_printkey = {'name': 'printkey', 'table': 'PrintKey',
+                   'output': 'db', 'type': 'default',
+                   'shell': True, 'dump': False, 'parms': vp_plugin_parms}
 
-    rc, result = execute_volatility_plugin(plugin_type="default",
-                                            plugin_name="printkey",
-                                            output="db",
-                                            result=result,
-                                            project=_project,
-                                            shell=True,
-                                            dump=False,
-                                            plugin_parms=plugin_parms)
-    if result['status']:
-        debug("CMD completed")
-    else:
-        err(result['message'])
+    vp_systeminfo = {'name': 'systeminfo', 'table': 'SystemInfo',
+                     'output': 'db', 'type': 'contrib',
+                     'shell': True, 'dump': False, 'parms': None}
 
+    volatility_plugins = [vp_printkey, vp_systeminfo]
 
-    ##Run custom systeminfo
-    rc, result = execute_volatility_plugin(plugin_type="contrib",
-                                            plugin_name="systeminfo",
-                                            output="db",
-                                            result=result,
-                                            project=_project,
-                                            shell=True,
-                                            dump=False,
-                                            plugin_parms=None)
+    for plugin in volatility_plugins:
+
+        if not rdb.table_exists(plugin['table']):
+            rc, result = execute_volatility_plugin(plugin_type=plugin['type'],
+                                                   plugin_name=plugin['name'],
+                                                   output=plugin['output'],
+                                                   result=result,
+                                                   project=_project,
+                                                   shell=plugin['shell'],
+                                                   dump=plugin['dump'],
+                                                   plugin_parms=plugin['parms'])
+
+            if result['status']:
+                debug("CMD completed %s" % plugin['name'])
+            else:
+                err(result['message'])
 
     if result['status']:
         debug("CMD completed")
         result['cmd_results'] = extract_version_info()
     else:
         err("Will not extract version info")
-        #err(result['message'])
-
 
 
 def extract_version_info():
