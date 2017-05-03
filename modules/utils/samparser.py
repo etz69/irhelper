@@ -1,8 +1,11 @@
-##Slight modification for reading dumped registry
-##Various conditions exist when reading dimped SAM reg
-##original file is samparse.py
+##Modified version of samparse.py for reading dumped registry
+##Various conditions exist when reading dumped SAM reg
+#-Added json output
+#-Fixed some errors
+#Original version at:
+#https://github.com/yampelo/samparser
 
-import struct, datetime, argparse
+import struct,datetime, argparse
 from collections import OrderedDict
 from Registry import Registry #python-registry
 import sys
@@ -95,7 +98,7 @@ def samparse(samhive):
             for a in x.subkeys():
                 try:
                     results['users'][a.name()]['Account Created Date'] = a.timestamp().strftime('%d %B %Y - %H:%M:%S')
-                except Exception,e:
+                except Exception as e:
                     print("Error with key")
         else:
             for a in x.values():

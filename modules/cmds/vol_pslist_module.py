@@ -433,7 +433,7 @@ def analyse_scan_processes(_project):
 
     vp_apihooks = {'name': 'apihooks', 'table': 'ApiHooks',
                    'output': 'db', 'type': 'default',
-                   'shell': False, 'dump': False, 'parms': None}
+                   'shell': False, 'dump': False, 'parms': '-Q'}
 
     vp_malfind = {'name': 'malfind', 'table': 'Malfind',
                   'output': 'db', 'type': 'default',

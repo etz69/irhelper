@@ -150,7 +150,11 @@ def main():
     ##Set global target image values
     project.set_image_kdgb(image_info['KDBG'])
     image_info['image_name'] = project.get_image_name()
-    profile_array = image_info['Suggested Profile(s)'].split(",")
+    rprofile_array = image_info['Suggested Profile(s)'].split(",")
+    profile_array = []
+    for profile in rprofile_array:
+        debug(profile)
+        profile_array.append(profile.strip().split(" ")[0])
 
     if project.get_volatility_profile() == "":
         for n in range(0, len(profile_array)):
@@ -159,7 +163,7 @@ def main():
         choice = raw_input("Please enter profile number or name: ")
         try:
             profile = profile_array[int(choice)].strip()
-        except Exception, e:
+        except Exception as e:
             profile = choice
 
         project.set_volatility_profile(profile)
