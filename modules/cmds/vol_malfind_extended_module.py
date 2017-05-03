@@ -40,8 +40,6 @@ def vol_malfind_extended(_project):
 
         line_number += 1
 
-    #print sections
-    #print len(sections)
     running = True
     results = []
     process_list = {}
@@ -69,8 +67,6 @@ def vol_malfind_extended(_project):
             process_list['mz'] = mlf.check_mz(mlf.get_hex_string(data)[0])
             process_list['entropy'] = calculate_shanon_string(process_list['asm'])
 
-            #print process_list['pid'],process_list['mem_loc'],process_list['mz'],process_list['asm']
-            #choice = raw_input("Good or Bad? ")
             choice = "good"
             process_list['classification'] = choice
 

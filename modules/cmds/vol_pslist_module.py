@@ -1,4 +1,3 @@
-import re
 import collections
 import json
 import sys
@@ -13,54 +12,59 @@ import sqlite3
 result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
 
 
-def vol_pslist(project):
+def vol_pslist(_project):
     global result
 
     ######TEST AREA
-
     ######TEST AREA
 
-
     print_header("Executing vol_pslist...")
-    rdb = dbops.DBOps(project.db_name)
+    rdb = dbops.DBOps(_project.db_name)
 
-    if not rdb.table_exists("PSList"):
-        rc, result = execute_volatility_plugin(plugin_type="default",
-                                                plugin_name="pslist",
-                                                output="db",
-                                                result=result,
-                                                project=project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
+    vp_list = {'name': 'pslist', 'table': 'PSList',
+               'output': 'db', 'type': 'default',
+               'shell': False, 'dump': False, 'parms': None}
 
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
+    ##Note this is stdout so we need to store for later
+    vp_psinfo_out = ""
+    vp_psinfo = {'name': 'psinfo2', 'table': 'psinfo2',
+                 'output': 'stdout', 'type': 'contrib',
+                 'shell': False, 'dump': False, 'parms': None}
 
-    print("Gathering more process info...")
+    vp_verinfo = {'name': 'verinfo', 'table': 'VerInfo',
+                  'output': 'db', 'type': 'default',
+                  'shell': False, 'dump': False, 'parms': None}
 
-    if not rdb.table_exists("psinfo2"):
-        rc, result = execute_volatility_plugin(plugin_type="contrib",
-                                                plugin_name="psinfo2",
-                                                output="stdout",
-                                                result=result,
-                                                project=project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
+    vp_dumpprocesses = {'name': 'procdump', 'table': 'ProcDump',
+                        'output': 'db', 'type': 'default',
+                        'shell': True, 'dump': True, 'parms': None}
 
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
+    volatility_plugins = [vp_list, vp_psinfo, vp_verinfo, vp_dumpprocesses]
+
+    for plugin in volatility_plugins:
+
+        if not rdb.table_exists(plugin['table']):
+            rc, result = execute_volatility_plugin(plugin_type=plugin['type'],
+                                                   plugin_name=plugin['name'],
+                                                   output=plugin['output'],
+                                                   result=result,
+                                                   project=_project,
+                                                   shell=plugin['shell'],
+                                                   dump=plugin['dump'],
+                                                   plugin_parms=plugin['parms'])
+
+            if result['status']:
+                debug("CMD completed %s" % plugin['name'])
+                if plugin['name'] == "psinfo2":
+                    vp_psinfo_out = result['cmd_results']
+            else:
+                err(result['message'])
 
     if result['status']:
 
         processinfo_data = []
 
-        for line in result['cmd_results'].split("\n"):
+        for line in vp_psinfo_out.split("\n"):
             try:
                 psinfo_line = line.rstrip("\n").split("|")
                 psinfo = {}
@@ -81,37 +85,14 @@ def vol_pslist(project):
 
         _table_name = "psinfo2"
 
-        rdb = dbops.DBOps(project.db_name)
-        rdb.new_table(_table_name, {'process':'text','process_fullname':'text',
-                                  'pid':'integer', 'ppid':'text','imagepath':'text',
-                                  'cmdline':'text'})
+        rdb = dbops.DBOps(_project.db_name)
+        rdb.new_table(_table_name, {'process': 'text', 'process_fullname': 'text',
+                                    'pid': 'integer', 'ppid': 'text',
+                                    'imagepath': 'text',
+                                    'cmdline': 'text'})
 
         rdb.insert_into_table(_table_name, processinfo_data)
 
-    if not rdb.table_exists("VerInfo"):
-        rc, result = execute_volatility_plugin(plugin_type="default",
-                                                plugin_name="verinfo",
-                                                output="db",
-                                                result=result,
-                                                project=project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
-
-
-    ###Dump pslist processes in dump dir and run checks
-    rc, result = execute_volatility_plugin(plugin_type="default",
-                                             plugin_name="procdump",
-                                             output="stdout",
-                                             result=result,
-                                             project=project,
-                                             shell=True,
-                                             dump=True,
-                                             plugin_parms=None)
 
     ##Run exiftool and store information
     if not rdb.table_exists("exiftool"):
@@ -121,7 +102,7 @@ def vol_pslist(project):
         cmd_array.append('exiftool')
         cmd_array.append('-j')
         cmd_array.append('-q')
-        cmd_array.append(project.dump_dir)
+        cmd_array.append(_project.dump_dir)
 
         debug(cmd_array)
         try:
@@ -151,7 +132,7 @@ def vol_pslist(project):
                     table_columns[x] = "text"
 
                 _table_name = "exiftool"
-                rdb = dbops.DBOps(project.db_name)
+                rdb = dbops.DBOps(_project.db_name)
                 rdb.new_table_from_keys(_table_name, table_columns)
 
                 rdb.insert_into_table(_table_name, jdata)
@@ -160,8 +141,8 @@ def vol_pslist(project):
                 err("Error running exiftool")
                 result['errors'].append(e)
 
-    ##Now run the analyser code
-    violations, plist = analyse_processes(project)
+    ##Now run the analyser code part
+    violations, plist = analyse_processes(_project)
     result['cmd_results'] = {'violations': [], 'plist': [],
                              'plist_extended': [],
                              'suspicious_processes': [],}
@@ -172,11 +153,10 @@ def vol_pslist(project):
     enrich_exif_with_shanon_entropy()
     calculate_md5()
 
-    epslist_data = enrich_pslist(project, plist)
+    epslist_data = enrich_pslist(_project, plist)
     result['cmd_results']['plist_extended'] = epslist_data
 
-
-    risk_list = analyse_scan_processes(project)
+    risk_list = analyse_scan_processes(_project)
     suspicious_plist = []
     for p in risk_list:
         suspicious_process = {}
@@ -190,9 +170,9 @@ def vol_pslist(project):
     result['cmd_results']['suspicious_processes'] = suspicious_plist
 
 
-def enrich_pslist(project, plist):
+def enrich_pslist(_project, plist):
 
-    rdb = dbops.DBOps(project.db_name)
+    rdb = dbops.DBOps(_project.db_name)
     query = "select FileName,CompanyName,OriginalFileName," \
             "FileDescription,FileSize,LegalCopyright,FileDescription,md5," \
             "InternalName,sentropy from exiftool"
@@ -212,7 +192,7 @@ def enrich_pslist(project, plist):
 
 
 def calculate_md5():
-    print_header("Calculating MD5 of dumped files. This may take a while")
+    print_header("Calculating MD5 of dumped files..")
 
     rdb = dbops.DBOps("results.db")
     rdb.patch_table('exiftool','md5','text')
@@ -262,9 +242,7 @@ def enrich_exif_with_shanon_entropy():
             pass
 
 
-
-
-def analyse_processes(project):
+def analyse_processes(_project):
     '''
     This module will check all running processes to verify that the correct
     parent process has spawned the running one.
@@ -293,18 +271,18 @@ def analyse_processes(project):
 
 ###Notes:
 ###wininit.exe starts from an instance of smss.exe that exits so most likely the parent does not exist
-
+##svchost is accessing the network to public addresses (eg. Windows updateS) with ppid/name services.exe
     known_processes_Vista = {
-        'system'        : { 'pid' : 4, 'image_path' : '', 'user_account' : 'Local System', 'parent' : 'none', 'singleton' : True, 'prio' : '8' },
+        'system'        : { 'pid' : 4, 'image_path' : '', 'user_account' : 'Local System', 'parent' : 'none', 'singleton' : True, 'prio' : '8' ,'Public Net access': True, 'Private Net access': True},
         'smss.exe'      : {'image_path' : 'windows\System32\smss.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'parent' : 'system', 'singleton' : True, 'session' : '', 'prio' : '11' },
         'wininit.exe'   : {'image_path' : 'windows\System32\wininit.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'parent' : 'none', 'session' : '0', 'children' : False, 'prio' : '13', 'starts_at_boot' : True },
-        'lsass.exe'     : {'image_path' : 'windows\system32\lsass.exe' , 'user_account' : 'Local System', 'parent' : 'wininit.exe', 'singleton' : True, 'session' : '0', 'prio' : '9', 'childless' : True, 'starts_at_boot' : True },
+        'lsass.exe'     : {'image_path' : 'windows\system32\lsass.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'parent' : 'wininit.exe', 'singleton' : True, 'session' : '0', 'prio' : '9', 'childless' : True, 'starts_at_boot' : True },
         'winlogon.exe'  : {'image_path' : 'windows\system32\winlogon.exe' , 'user_account' : 'Local System', 'session' : '1' , 'prio' : '13'},
-        'csrss.exe'     : {'image_path' : 'windows\system32\csrss.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'prio' : '13', 'starts_at_boot' : True },
+        'csrss.exe'     : {'image_path' : 'windows\system32\csrss.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'prio' : '13', 'session' : '1', 'starts_at_boot' : True },
         'services.exe'  : {'image_path' : 'windows\system32\services.exe' , 'parent' : 'wininit.exe', 'session' : '0', 'prio' : '9', 'starts_at_boot' : True },
-        'svchost.exe'   : {'image_path' : 'windows\System32\svchost.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM', 'LOCAL SERVICE', 'NETWORK SERVICE'], 'parent' : 'services.exe', 'singleton' : False, 'session' : '0', 'prio' : '8', 'starts_at_boot' : True },
-        'lsm.exe'      : {'image_path' : 'windows\System32\lsm.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'parent' : 'wininit.exe', 'session' : '0', 'prio' : '8', 'childless' : True, 'starts_at_boot' : True },
-        'explorer.exe'  : {'image_path' : 'windows\explorer.exe' , 'prio' : '8' },
+        'svchost.exe'   : {'image_path' : 'windows\System32\svchost.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM', 'LOCAL SERVICE', 'NETWORK SERVICE'], 'parent' : 'services.exe', 'singleton' : False, 'session' : '0', 'prio' : '8', 'starts_at_boot' : True ,'Public Net access': True, 'Private Net access': True},
+        'lsm.exe'       : {'image_path' : 'windows\System32\lsm.exe' , 'user_account' : ['NT AUTHORITY\SYSTEM'], 'parent' : 'wininit.exe', 'session' : '0', 'prio' : '8', 'childless' : True, 'starts_at_boot' : True },
+        'explorer.exe'  : {'image_path' : 'windows\explorer.exe' , 'parent' : 'none','session' : '1' ,'singleton' : False, 'prio' : '8' },
     }
 
     ##First we need to construct relevant process information structure so
@@ -323,12 +301,14 @@ def analyse_processes(project):
     ## to minimise false positives . Not all information is available sometimes
 
     ##First put all processes from pslist with enriched info into an array
-    con = sqlite3.connect('results.db')
+    con = sqlite3.connect(_project.db_name)
     con.row_factory = sqlite3.Row
     cur = con.cursor()
-    cur.execute('select psinfo2.process_fullname,psinfo2.process,psinfo2.pid,psinfo2.ppid,'
+    cur.execute('select psinfo2.process_fullname,psinfo2.process,psinfo2.pid,'
+                'psinfo2.ppid,'
                 'psinfo2.imagepath,pslist.hnds,pslist.sess,pslist.thds, '
-                '(SELECT ps2.process_fullname FROM psinfo2 ps2 WHERE ps2.pid = psinfo2.ppid) AS parentname'
+                '(SELECT ps2.process_fullname FROM psinfo2 ps2 '
+                'WHERE ps2.pid = psinfo2.ppid) AS parentname'
                 ' from psinfo2 inner join pslist on psinfo2.pid = pslist.pid')
 
     rows = cur.fetchall()
@@ -360,8 +340,8 @@ def analyse_processes(project):
         target_process_list.append(ps.copy())
         full_pslist_dict[ps['name']] = ps.copy()
 
-    if str(project.get_volatility_profile()).startswith("WinXP") \
-            or str(project.get_volatility_profile()).startswith("Win2003"):
+    if str(_project.get_volatility_profile()).startswith("WinXP") \
+            or str(_project.get_volatility_profile()).startswith("Win2003"):
         rule_list = known_processes_XP
     else:
         rule_list = known_processes_Vista
@@ -374,13 +354,17 @@ def analyse_processes(project):
                         ###NOt all have peb information
                         if not str(process[check]).lower() == str(rule_list[key][check]).lower() and str(process[check]).lower() != "nopeb" :
 
-                            print("Violation detected on: [%s] Actual value: [%s] Expected value: [%s]" %(check, process[check], rule_list[key][check]))
+                            print("Violation detected on: [%s] "
+                                  "Actual value: [%s] Expected value: [%s]"
+                                  % (check, process[check], rule_list[key][check]))
                             print(process)
                             violations_count += 1
                             violation_message['id'] = violations_count
                             violation_message['process'] = process
                             violation_message['rule'] = check
-                            violation_message['details'] = ("Violation detected on: [%s] Actual value: [%s] Expected value: [%s]" %(check,process[check],rule_list[key][check]))
+                            violation_message['details'] = ("Violation detected on: [%s] "
+                                                            "Actual value: [%s] Expected value: [%s]"
+                                                            % (check, process[check], rule_list[key][check]))
                             violations.append(violation_message.copy())
 
 
@@ -389,39 +373,47 @@ def analyse_processes(project):
     for process in target_process_list:
         processes.append(str(process['name']).lower())
 
-    counter=collections.Counter(processes)
+    counter = collections.Counter(processes)
 
     for key in rule_list:
 
         if key in processes and "singleton" in rule_list[key]:
             if int(counter[key]) > 1 and rule_list[key]['singleton']:
-                print("Violation detected on: [singleton] condition from [%s] Actual value: [%s]" %(key,int(counter[key])))
+                print("Violation detected on: [singleton] condition "
+                      "from [%s] Actual value: [%s]" % (key, int(counter[key])))
                 violations_count += 1
                 violation_message['id'] = violations_count
                 violation_message['process'] = full_pslist_dict[key]
                 violation_message['rule'] = "[Singleton]"
-                violation_message['details'] = ("Violation detected on: [singleton] condition from [%s] Actual value: [%s]" %(key,int(counter[key])))
+                violation_message['details'] = ("Violation detected on: "
+                                                "[singleton] condition "
+                                                "from [%s] Actual value: [%s]"
+                                                % (key, int(counter[key])))
                 violations.append(violation_message.copy())
                 print(full_pslist_dict[key])
 
     ####Lets try to detect similar wording in well known processes
-    usual_suspects = ['smss.exe', 'wininit.exe','csrss.exe','svchost.exe',
-                      'lsass.exe','lsm.exe','wmpnetwk.exe','wuauclt.exe']
+    usual_suspects = ['smss.exe', 'wininit.exe', 'csrss.exe', 'svchost.exe',
+                      'lsass.exe', 'lsm.exe', 'wmpnetwk.exe', 'wuauclt.exe']
 
     ##Injecting bad process names
     #target_process_list.append("scvhost.exe")
-    #target_process_list.append("lsa.exe")
 
     for process in target_process_list:
         for suspect in usual_suspects:
             flag, score = score_jaro_distance(process,suspect)
             if flag:
-                print("Possible culrpit process detected: [%s] resembles to: [%s] Score: [%s]" %(process,suspect,score))
+                print("Possible culrpit process detected: [%s] "
+                      "resembles to: [%s] Score: [%s]"
+                      % (process, suspect, score))
                 violations_count += 1
                 violation_message['id'] = violations_count
                 violation_message['process'] = process
                 violation_message['rule'] = "[Culrpit]"
-                violation_message['details'] = ("Possible culrpit process detected: [%s] resembles to: [%s] Score: [%s]" %(process,suspect,score))
+                violation_message['details'] = ("Possible culrpit process "
+                                                "detected: [%s] resembles "
+                                                "to: [%s] Score: [%s]"
+                                                % (process, suspect, score))
                 violations.append(violation_message.copy())
 
     return violations, target_process_list
@@ -434,53 +426,38 @@ def analyse_scan_processes(_project):
     print_header("Gathering information from scan process")
 
     rdb = dbops.DBOps(_project.db_name)
-    if not rdb.table_exists("PsXview"):
-        rc, result = execute_volatility_plugin(plugin_type="contrib",
-                                                plugin_name="psxview",
-                                                output="db",
-                                                result=result,
-                                                project=_project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
 
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
+    vp_psxview = {'name': 'psxview', 'table': 'PsXview',
+                  'output': 'db', 'type': 'default',
+                  'shell': False, 'dump': False, 'parms': None}
 
-    if not rdb.table_exists("ApiHooks"):
-        rc, result = execute_volatility_plugin(plugin_type="contrib",
-                                                plugin_name="apihooks",
-                                                output="db",
-                                                result=result,
-                                                project=_project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
+    vp_apihooks = {'name': 'apihooks', 'table': 'ApiHooks',
+                   'output': 'db', 'type': 'default',
+                   'shell': False, 'dump': False, 'parms': None}
 
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
+    vp_malfind = {'name': 'malfind', 'table': 'Malfind',
+                  'output': 'db', 'type': 'default',
+                  'shell': False, 'dump': False, 'parms': None}
 
-    if not rdb.table_exists("Malfind"):
-        rc, result = execute_volatility_plugin(plugin_type="contrib",
-                                                plugin_name="malfind",
-                                                output="db",
-                                                result=result,
-                                                project=_project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
+    volatility_plugins = [vp_psxview, vp_apihooks, vp_malfind]
 
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
+    for plugin in volatility_plugins:
 
+        if not rdb.table_exists(plugin['table']):
+            rc, result = execute_volatility_plugin(plugin_type=plugin['type'],
+                                                   plugin_name=plugin['name'],
+                                                   output=plugin['output'],
+                                                   result=result,
+                                                   project=_project,
+                                                   shell=plugin['shell'],
+                                                   dump=plugin['dump'],
+                                                   plugin_parms=plugin['parms'])
 
-    ##Three arrays
+            if result['status']:
+                debug("CMD completed %s" % plugin['name'])
+            else:
+                err(result['message'])
+
     psxview = []
     apihooked = []
     malfinded = []
@@ -489,10 +466,7 @@ def analyse_scan_processes(_project):
     ## Analyse further the ones with PID=false psscan=True and ExitTime null
     #select * from psxview where pslist="False" and psscan="True" and exittime="";
     if rdb.table_exists("PsXview"):
-        jdata = {}
-        #query = 'select * from psxview where pslist=\"False\"' \
-        #        ' and psscan=\"True\" and not ExitTime '
-        query = "select * from psxview where psscan=\"True\""
+        query = "SELECT * FROM psxview WHERE psscan=\"True\""
 
         jdata = rdb.sqlite_query_to_json(query)
         for entry in jdata:
@@ -502,10 +476,8 @@ def analyse_scan_processes(_project):
     else:
         err("No PSXView data")
 
-
     if rdb.table_exists("ApiHooks"):
-        jdata = {}
-        query = "select PID, Process, VictimModule, Function from ApiHooks"
+        query = "SELECT PID, Process, VictimModule, Function FROM ApiHooks"
         jdata = rdb.sqlite_query_to_json(query)
         for entry in jdata:
             apihooked.append(entry['PID'])
@@ -513,14 +485,11 @@ def analyse_scan_processes(_project):
                 process_risk[entry['PID']] = 2
             else:
                 process_risk[entry['PID']] = 1
-
     else:
         err("No ApiHooks data")
 
-
     if rdb.table_exists("Malfind"):
-        jdata = {}
-        query = "select Pid, Process from Malfind group by Pid"
+        query = "SELECT Pid, Process FROM Malfind GROUP BY Pid"
         jdata = rdb.sqlite_query_to_json(query)
         for entry in jdata:
             malfinded.append(entry['Pid'])
@@ -530,25 +499,25 @@ def analyse_scan_processes(_project):
                 process_risk[entry['Pid']] = 2
             if entry['Pid'] not in apihooked and entry['Pid'] in psxview:
                 process_risk[entry['Pid']] = 2
-
     else:
         err("No Malfind data")
-
 
     ##Then for every process from above check the following :
     #1. apihooks
     #2. malfind
-    # more to come this is just a very simple approach (there will be false positives as well
-    ##Finally we assign a risk score:
+    # more to come this is just a very simple approach (there will
+    # be false positives as well
+    ##Finally we assign a silly risk score:
     # 10 to the ones from psscan
     # 10 to the ones from apihooks
-    # 10 to the ones in malfind (next version we identify shellcode with ML ! :)
-
-    debug("Process risk list:%s " %process_risk)
+    # 10 to the ones in malfind (next version we identify shellcode with ML! :)
+    debug("Process risk list:%s " % process_risk)
     return process_risk
+
 
 def get_result():
     return result
+
 
 def show_json(in_response):
     ##Function to test json output
@@ -556,7 +525,7 @@ def show_json(in_response):
 
 if __name__ == "__main__":
     #
-    print("Python version: %s\n " %sys.version)
+    print("Python version: %s\n " % sys.version)
     DB_NAME = "results.db"
 
     set_debug(True)

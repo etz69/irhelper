@@ -8,6 +8,8 @@ import subprocess
 import ConfigParser
 import re
 from sets import Set
+import glob
+import os
 
 from modules.db import DBops as dbops
 
@@ -55,7 +57,7 @@ def print_header(msg):
 def print_cmd_results(data):
     print("\n-------------------------------------")
     for k in data:
-        print("%s: %s" %(k, data[k]))
+        print("%s:\t %s" % (k, data[k]))
     print("-------------------------------------\n")
 
 
@@ -141,6 +143,7 @@ def is_ipv4(input_string):
     except Exception,e:
         return False
 
+
 def valid_ip(input_string):
     #Return if IP not local/Brodacast and if private or public
 
@@ -183,7 +186,6 @@ def execute_volatility_plugin(plugin_type, plugin_name,
     if dump:
         cmd_array.append("-D "+project.dump_dir)
 
-
     ##The actual plugin name
     cmd_array.append(plugin_name)
     if plugin_parms is not None:
@@ -193,10 +195,9 @@ def execute_volatility_plugin(plugin_type, plugin_name,
         cmd_array.append('--output=sqlite')
         cmd_array.append('--output-file='+project.db_name)
 
-        debug(cmd_array)
+        cmd = ' '.join(cmd_array)
+        debug(cmd)
         if shell:
-            cmd = ' '.join(cmd_array)
-            debug(cmd)
             debug("Shell enabled")
             rc = subprocess.call(cmd, shell=True)
         else:
@@ -208,10 +209,10 @@ def execute_volatility_plugin(plugin_type, plugin_name,
             result['status'] = False
             result['message'] = plugin_name+" command failed!"
     if output == "stdout":
-        debug(cmd_array)
+        cmd = ' '.join(cmd_array)
+        debug(cmd)
         try:
             if shell:
-                cmd = ' '.join(cmd_array)
                 debug(cmd)
                 debug("Shell enabled")
                 rc = subprocess.check_output(cmd, shell=True)
@@ -226,7 +227,6 @@ def execute_volatility_plugin(plugin_type, plugin_name,
             result['errors'].append(e)
 
     return rc, result
-
 
 
 class MafindTool():
@@ -327,10 +327,21 @@ class Project():
 
     def clean_db(self):
         '''
-        Deletes the DB
+        Deletes the DB, deletes all files from dump dir and removes the cache
 
         '''
         self.rdb.clean_db(self.db_name)
+        files_to_delete = glob.glob(self.dump_dir+"*")
+        if len(files_to_delete) > 0:
+            print("I am about to delete [%d] files "
+                  "from: [%s]" % (len(files_to_delete), self.dump_dir))
+            choice = raw_input("Confirm [y/n]")
+
+            if choice == "n":
+                return
+            if choice == "y":
+                for f in files_to_delete:
+                    os.remove(f)
 
     def get_root(self):
         '''
