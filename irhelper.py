@@ -8,12 +8,6 @@ from modules.utils.helper import *
 import sys
 import os
 
-GLOBALS = {}
-
-GLOBALS['_KDBG'] = ""
-GLOBALS['_cache'] = True
-#GLOBALS['PLUGIN_DIR'] = sys.path[0]+"/vol_plugins/"
-#GLOBALS['DUMP_DIR'] = sys.path[0]+"/dump/"
 CACHE_FILE = "/tmp/memoize.pkl"
 
 
@@ -44,7 +38,7 @@ parser.add_argument("-p", '--profile', nargs='?', help="Volatility profile")
 parser.add_argument('--cache', action="store_true", help="Enable cache")
 parser.add_argument('--debug', action="store_true", help="Run in debug")
 parser.add_argument('--initdb', action="store_true", help="Initialise local DB")
-parser.add_argument('--hash',action="store_true", help="Generate hashes")
+parser.add_argument('--hash', action="store_true", help="Generate hashes")
 parser.add_argument("-v", '--version', action="version",
                     version="%(prog)s v0.1.0")
 
@@ -53,6 +47,7 @@ args = parser.parse_args()
 from functools import wraps
 
 ##EXPERIMENTAL!
+
 
 def memoize(func):
     if os.path.exists(CACHE_FILE) and args.cache:
@@ -90,10 +85,8 @@ def memoize(func):
 def run_cmd(command, project):
 
     cmdp = cmd_processor.CommandProcessor()
-    #print("\nSupported Commands:")
-    #for cmd in cmdp.get_commands():
-    #    print cmd
-    debug("Running cmd: %s" %command)
+
+    debug("Running cmd: %s" % command)
     response = cmdp.prep_cmd(cmd_name=command, project=project)
     if not response['status']:
         err(response['message'])
@@ -105,6 +98,8 @@ def run_cmd(command, project):
 
 
 def main():
+    if os.geteuid() == 0:
+        exit("You must not run this code with root privileges")
 
     if args.debug:
         set_debug(True)
@@ -119,7 +114,7 @@ def main():
     if args.hash:
         debug("Generating image hash")
         md5 = md5sum(args.memoryImageFile)
-        debug("MD5:%s" %md5)
+        debug("MD5:%s" % md5)
     else:
         md5 = "NONE"
 
@@ -131,8 +126,6 @@ def main():
     if args.profile:
         project.set_volatility_profile(args.profile)
         debug("Using %s" % project.get_volatility_profile())
-    else:
-        print("No profile provided")
 
     if args.initdb:
         project.clean_db()
@@ -197,12 +190,10 @@ def main():
     eplist = response['cmd_results']['plist_extended']
     suspicious_plist = response['cmd_results']['suspicious_processes']
 
-
     response = run_cmd("vol_malfind_extend", project)
     if not response['status']:
         err(response['message'])
     malprocesses = response['cmd_results']
-
 
     response = run_cmd("vol_regdump", project)
     if not response['status']:
@@ -217,7 +208,6 @@ def main():
         network_info = {}
     else:
         network_info = response['cmd_results']['network']
-
 
     ##Write to template
     if not os.path.exists("export"):
@@ -234,7 +224,7 @@ def main():
         image_md5=md5,
         version_info=version_info,
         rule_violations=rule_violations,
-        malprocesses = malprocesses,
+        malprocesses=malprocesses,
         plist=plist,
         eplist=eplist,
         suspicious_plist=suspicious_plist,
@@ -242,7 +232,7 @@ def main():
         network_info=network_info
 
     )
-    debug("Writing report ..")
+    debug("Writing report to [%s]" % exportpath)
     fo.write(mytemplate.encode('utf-8'))
     fo.close
 

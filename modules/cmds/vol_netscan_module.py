@@ -42,74 +42,48 @@ def vol_netscan(_project):
         result['message'] = "Empty profile!"
         return result
 
-    ##todo:add connscan
+    volatility_plugins = {}
+
     if _profile.startswith('WinXP') or _profile.startswith('Win2003'):
-        volatility_plugin = "sockscan"
-        _net_table = "SockScan"
-        debug("Running sockscan")
+        volatility_plugins = {'sockscan': 'SockScan', 'connscan': 'ConnScan'}
     else:
-        volatility_plugin = "netscan"
-        _net_table = "Netscan"
-        debug("Running netscan")
+        volatility_plugins = {'netscan': 'Netscan'}
+
+    debug("Running %s" % volatility_plugins)
 
     rdb = dbops.DBOps(_project.db_name)
 
-    if not rdb.table_exists(_net_table):
-        debug("Table for %s not found running now" %volatility_plugin)
+    for plugin in volatility_plugins:
 
-
-        rc, result = execute_volatility_plugin(plugin_type="default",
-                                                plugin_name=volatility_plugin,
-                                                output="db",
-                                                result=result,
-                                                project=_project,
-                                                shell=False,
-                                                dump=False,
-                                                plugin_parms=None)
-
-        if result['status']:
-            debug("CMD completed")
-        else:
-            err(result['message'])
-
-    ##Run Connscan also
-    if _profile.startswith('WinXP') or _profile.startswith('Win2003'):
-        volatility_plugin = "connscan"
-        _net_table = "ConnScan"
-        if not rdb.table_exists(_net_table):
-            debug("Table for %s not found running now" %volatility_plugin)
-
+        if not rdb.table_exists(volatility_plugins[plugin]):
+            debug("Table for %s not found running" % plugin)
 
             rc, result = execute_volatility_plugin(plugin_type="default",
-                                                    plugin_name=volatility_plugin,
-                                                    output="db",
-                                                    result=result,
-                                                    project=_project,
-                                                    shell=False,
-                                                    dump=False,
-                                                    plugin_parms=None)
+                                                   plugin_name=plugin,
+                                                   output="db",
+                                                   result=result,
+                                                   project=_project,
+                                                   shell=False,
+                                                   dump=False,
+                                                   plugin_parms=None)
 
             if result['status']:
-                debug("CMD completed")
+                debug("CMD completed %s" % plugin)
             else:
                 err(result['message'])
 
-
-
-    ###TODO: This should be moved in pslist module or check for table
     print_header("Executing vol_pslist...")
 
-
     if not rdb.table_exists('PSList'):
-        debug("Table for pslist not found running now")
+        debug("Table for pslist not found running plugin")
         rc, result = execute_volatility_plugin(plugin_type="default",
-                                            plugin_name="pslist",
-                                            output="db",
-                                            result=result,
-                                            project=_project,
-                                            shell=False,
-                                            dump=False,
-                                            plugin_parms=None)
+                                               plugin_name="pslist",
+                                               output="db",
+                                               result=result,
+                                               project=_project,
+                                               shell=False,
+                                               dump=False,
+                                               plugin_parms=None)
 
         if result['status']:
             debug("CMD completed")
@@ -122,8 +96,8 @@ def vol_netscan(_project):
     #ndispktscan experimental
     extended_network_info = []
     for entry in result['cmd_results']['network']:
-        flag, type = valid_ip(entry['destination'].split(":")[0])
-        entry['address_type'] = type
+        flag, _type = valid_ip(entry['destination'].split(":")[0])
+        entry['address_type'] = _type
         entry['ip_address'] = entry['destination'].split(":")[0]
         extended_network_info.append(entry.copy())
 
@@ -214,9 +188,7 @@ def normalize_network_info(_project):
                 if str(p) == str(e[0]):
 
                     rdict[str(p)] = plist[p]
-
         f = []
-        #result['cmd_results']['network'].append(n.copy())
 
         for entry in cleaned:
             if str(entry[0]) in rdict:
@@ -258,7 +230,7 @@ def generate_network_graph(data, _project):
         import matplotlib.pyplot as plt
 
         backend = matplotlib.get_backend()
-        debug("Using Pyplot backend: %s" %backend)
+        debug("Using Pyplot backend: %s" % backend)
 
         G = nx.DiGraph()
         G.add_edges_from(data)
@@ -268,14 +240,14 @@ def generate_network_graph(data, _project):
         node_labels = {node: node for node in G.nodes()}
 
         font = {'fontname': 'Arial',
-                    'color': 'white',
-                    'fontweight': 'bold',
-                    'fontsize': 14}
+                'color': 'white',
+                'fontweight': 'bold',
+                'fontsize': 14}
         plt.title("Network connection graph")
         nx.draw(G, pos, node_size=10 , node_color='red', edge_color='red',
                 font_color='white', labels=node_labels, font_size=8,
                 arrows=False, alpha=0.4)
-        #pylab.show()
+
         f.savefig(_project.report_export_location+"netgraph.png", dpi=200)
     else:
         debug("PyPlot is disabled. No graph")
