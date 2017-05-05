@@ -93,7 +93,6 @@ def vol_pslist(_project):
 
         rdb.insert_into_table(_table_name, processinfo_data)
 
-
     ##Run exiftool and store information
     if not rdb.table_exists("exiftool"):
 
@@ -195,21 +194,23 @@ def calculate_md5():
     print_header("Calculating MD5 of dumped files..")
 
     rdb = dbops.DBOps("results.db")
+
     rdb.patch_table('exiftool','md5','text')
 
-    rows = rdb.get_all_rows('exiftool')
-    for rs in rows:
-        try:
-            md5 = md5sum(rs['SourceFile'])
-            table_name = "exiftool"
-            column_name = "md5"
-            value = str(md5)
-            key_name = "SourceFile"
-            _key = rs[key_name]
-            rdb.update_value(table_name, column_name, value, key_name, _key)
+    if rdb.table_exists('exiftool'):
+        rows = rdb.get_all_rows('exiftool')
+        for rs in rows:
+            try:
+                md5 = md5sum(rs['SourceFile'])
+                table_name = "exiftool"
+                column_name = "md5"
+                value = str(md5)
+                key_name = "SourceFile"
+                _key = rs[key_name]
+                rdb.update_value(table_name, column_name, value, key_name, _key)
 
-        except Exception as e:
-            err(e)
+            except Exception as e:
+                err(e)
 
 
 def enrich_exif_with_shanon_entropy():
@@ -225,22 +226,24 @@ def enrich_exif_with_shanon_entropy():
     get_a_cofee()
 
     rdb = dbops.DBOps("results.db")
-    rdb.patch_table('exiftool','sentropy','REAL')
+    try:
+        rdb.patch_table('exiftool','sentropy','REAL')
 
-    rows = rdb.get_all_rows('exiftool')
-    for rs in rows:
-        try:
-            sn = str(calculate_shanon_entropy_file(rs['SourceFile']))
-            table_name = "exiftool"
-            column_name = "sentropy"
-            value = sn
-            key_name = "SourceFile"
-            _key = rs[key_name]
-            rdb.update_value(table_name, column_name, value, key_name, _key)
+        rows = rdb.get_all_rows('exiftool')
+        for rs in rows:
+            try:
+                sn = str(calculate_shanon_entropy_file(rs['SourceFile']))
+                table_name = "exiftool"
+                column_name = "sentropy"
+                value = sn
+                key_name = "SourceFile"
+                _key = rs[key_name]
+                rdb.update_value(table_name, column_name, value, key_name, _key)
 
-        except Exception as e:
-            pass
-
+            except Exception as e:
+                pass
+    except Exception as e:
+        err("Error calculating entropy")
 
 def analyse_processes(_project):
     '''

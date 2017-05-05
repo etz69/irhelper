@@ -166,21 +166,26 @@ class DBOps():
         Complex queries with filters do not work always
 
         '''
+        results = dict()
 
         sql = query
         c = self.conn.cursor()
         c.row_factory = sqlite3.Row
 
-        c.execute(sql)
+        try:
 
-        rows = c.fetchall()
-        results = []
+            c.execute(sql)
 
-        for rs in rows:
-            jdata = {}
-            for key in rs.keys():
-                jdata[key] = rs[key]
-            results.append(jdata.copy())
+            rows = c.fetchall()
+            results = []
+
+            for rs in rows:
+                jdata = {}
+                for key in rs.keys():
+                    jdata[key] = rs[key]
+                results.append(jdata.copy())
+        except Exception as e:
+            pass
 
         return results
 

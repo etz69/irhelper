@@ -45,34 +45,39 @@ def vol_malfind_extended(_project):
     process_list = {}
 
     while running:
-        for idx, elem in enumerate(sections):
+        debug(list(enumerate(sections)))
+        if len(list(enumerate(sections))) != 0:
+            for idx, elem in enumerate(sections):
+                if idx == (len(sections)-1):
+                    running = False
+                    break;
+                thiselem = elem
+                nextelem = sections[(idx + 1) % len(sections)]
+                data = mlf.get_section(thiselem,cmd_out,nextelem)
+                pid, name, address = mlf.serialize_data(data)
 
-            if idx == (len(sections)-1):
-                running = False
-                break;
-            thiselem = elem
-            nextelem = sections[(idx + 1) % len(sections)]
-            data = mlf.get_section(thiselem,cmd_out,nextelem)
-            pid, name, address = mlf.serialize_data(data)
+                asm = mlf.get_asm(data)
+                asm_string = ''.join(asm).replace(",","")
 
-            asm = mlf.get_asm(data)
-            asm_string = ''.join(asm).replace(",","")
+                matches = re.findall('[A-Z]{3}', asm_string, re.DOTALL)
 
-            matches = re.findall('[A-Z]{3}', asm_string, re.DOTALL)
+                process_list['asm'] = ':'.join(matches)
+                process_list['mem_loc'] = address
+                process_list['pid'] = pid
+                process_list['name'] = name
+                process_list['mz'] = mlf.check_mz(mlf.get_hex_string(data)[0])
+                process_list['entropy'] = calculate_shanon_string(process_list['asm'])
 
-            process_list['asm'] = ':'.join(matches)
-            process_list['mem_loc'] = address
-            process_list['pid'] = pid
-            process_list['name'] = name
-            process_list['mz'] = mlf.check_mz(mlf.get_hex_string(data)[0])
-            process_list['entropy'] = calculate_shanon_string(process_list['asm'])
+                choice = "good"
+                process_list['classification'] = choice
 
-            choice = "good"
-            process_list['classification'] = choice
+                results.append(process_list)
 
-            results.append(process_list)
+                process_list = {}
+        else:
+            debug("No section found")
+            running = False
 
-            process_list = {}
 
     result['cmd_results'] = results
 

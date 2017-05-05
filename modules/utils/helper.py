@@ -290,19 +290,30 @@ class Project():
     def __init__(self, settings_path):
         ##Everything starts from root
         self.settings_path = settings_path
-
         self.project_root = ""
         self.plugins_dir = ""
         self.report_export_location = ""
         self.dump_dir = ""
         self.pyplot_flag = False
-        self.load_properties()
         self.db_name = ""
         self.rdb = ""
         self.volatility_profile = ""
         self.image_name = ""
         self.image_kdgb = ""
+        self.result = self.init_result()
+        self.load_properties(self)
 
+    @staticmethod
+    def init_result():
+        _result = dict()
+        _result['status'] = True
+        _result['messages'] = []
+        _result['cmd_results'] = ''
+        _result['errors'] = []
+        _result['findings'] = []
+        return _result
+
+    @staticmethod
     def load_properties(self):
         '''
         Load the settings.py file
@@ -312,7 +323,8 @@ class Project():
         config.read(SETTINGS_FILE)
         self.project_root = config.get('Directories', 'root').strip("'")
         self.plugins_dir = config.get('Directories', 'plugins').strip("'")
-        self.report_export_location = config.get('Directories', 'report_export').strip("'")
+        self.report_export_location = config.get('Directories',
+                                                 'report_export').strip("'")
         self.dump_dir = config.get('Directories', 'dump').strip("'")
         self.pyplot_flag = config.get('Graph', 'pyplot')
 
