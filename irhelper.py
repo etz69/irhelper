@@ -153,7 +153,6 @@ def main():
     rprofile_array = image_info['Suggested Profile(s)'].split(",")
     profile_array = []
     for profile in rprofile_array:
-        debug(profile)
         profile_array.append(profile.strip().split(" ")[0])
 
     if project.get_volatility_profile() == "":
@@ -221,7 +220,7 @@ def main():
     fo = open(exportpath, "w")
 
     env = Environment(loader=FileSystemLoader("./"), trim_blocks=True)
-    print("Violations: %s" %len(rule_violations))
+    print("Violations: %s" % len(rule_violations))
     mytemplate = env.get_template(args.reportTemplate).render(
         profiles=",".join(profile_array),
         image_info=image_info,
@@ -242,4 +241,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

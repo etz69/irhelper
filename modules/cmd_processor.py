@@ -91,7 +91,7 @@ class Modules():
 
     def vol_imageinfo(self, **kwargs):
         '''
-        Retrieves basic image info such as the type, profiles, KDGB etc..
+        Retrieves basic image info such as the type, profiles, KDBG etc..
 
         Args:
             project (project): the project
@@ -111,7 +111,7 @@ class Modules():
 
     def vol_netscan(self, **kwargs):
         '''
-        Runs different modules to discover network related artifacts
+        Runs different modules to discover network connectivity
 
         Args:
             project (project): the project

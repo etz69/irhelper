@@ -49,7 +49,7 @@ def vol_regdump(project):
         err(result['message'])
 
 
-    reg_info = get_sam_offset()
+    reg_info = get_sam_offset(project)
     ##now lets dump the registry from mem
     ##Construct the required command
     ##First we need to find if the SAM is in memory
@@ -66,7 +66,8 @@ def vol_regdump(project):
     #The command and the output
     cmd_array.append('dumpregistry')
     cmd_array.append('-o')
-    cmd_array.append(reg_info['offset'])
+    if 'offset' in reg_info:
+        cmd_array.append(reg_info['offset'])
     cmd_array.append('-D')
     cmd_array.append(project.dump_dir)
 
@@ -105,20 +106,23 @@ def vol_regdump(project):
 
 
 
-def get_sam_offset():
+def get_sam_offset(_project):
 
 ### Get the SAM offset if it exists
-
+    data = dict()
     con = sqlite3.connect('results.db')
+    rdb = dbops.DBOps(_project.db_name)
     con.row_factory = sqlite3.Row
     cur = con.cursor()
-    cur.execute('select virtual,name from hivelist where name like "%Config\SAM%";')
-    rows = cur.fetchone()
-    data = {}
-    data['offset'] = '0x{:x}'.format(int(rows['virtual']))
-    data['name'] = rows['name']
+    if rdb.table_exists("hivelist"):
+        cur.execute('select virtual,name from hivelist where name like "%Config\SAM%";')
+        rows = cur.fetchone()
+        data['offset'] = '0x{:x}'.format(int(rows['virtual']))
+        data['name'] = rows['name']
 
-    con.close()
+        con.close()
+    else:
+        err("Hivelist table does not exist")
     return data
 
 

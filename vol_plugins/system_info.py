@@ -97,7 +97,8 @@ class SystemInfo(common.AbstractWindowsCommand):
 
     def generator(self, data):
         for result in data:
-            yield (0, ['{0}'.format(result.get('timestamp') if result.get('timestamp') else result.get('key').LastWriteTime),
+            try:
+                yield (0, ['{0}'.format(result.get('timestamp') if result.get('timestamp') else result.get('key').LastWriteTime),
                         '{0}'.format(result.get('value') if not result.get('timestamp_type') else result.get('timestamp_type')),
                         ('' if result.get('timestamp') else '{0}'.format(result.get('value'))),
                         ('' if not result.get('hive') else '{0} | {1}\\{2}'.format(result.get('value_name'),
@@ -107,6 +108,8 @@ class SystemInfo(common.AbstractWindowsCommand):
                                             ),
                     ]
                 )
+            except Exception as e:
+                pass
 
     # eh, I know - but wanted it displayed in a certain way
     def render_text(self, outfd, data):
@@ -124,7 +127,8 @@ class SystemInfo(common.AbstractWindowsCommand):
                                                     ]
                             )                    
             else:
-                row = '\t'.join('{0}'.format(x) for x in [('' if not result.get('key') else result.get('key').LastWriteTime),
+                try:
+                    row = '\t'.join('{0}'.format(x) for x in [('' if not result.get('key') else result.get('key').LastWriteTime),
                                                             result.get('timestamp_type'),
                                                             result.get('value'),
                                                             '{0} | {1}\\{2}'.format(result.get('value_name'),
@@ -133,5 +137,7 @@ class SystemInfo(common.AbstractWindowsCommand):
                                                                                 )
                                                     ]
                             )
+                except Exception as e:
+                    pass
 
             outfd.write(row + '\n')
