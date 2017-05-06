@@ -162,7 +162,7 @@ def vol_pslist(_project):
         suspicious_process['pid'] = p
         suspicious_process['risk'] = risk_list[p]
         for i in plist:
-            if str(i['pid']) ==  str(p):
+            if str(i['pid']) == str(p):
                 suspicious_process['name'] = i['name']
                 break
         suspicious_plist.append(suspicious_process.copy())
@@ -304,23 +304,26 @@ def analyse_processes(_project):
     ## to minimise false positives . Not all information is available sometimes
 
     ##First put all processes from pslist with enriched info into an array
+    target_process_list = []
+    rows = []
+    full_pslist_dict = dict()
+
     con = sqlite3.connect(_project.db_name)
     con.row_factory = sqlite3.Row
     cur = con.cursor()
-    cur.execute('select psinfo2.process_fullname,psinfo2.process,psinfo2.pid,'
-                'psinfo2.ppid,'
-                'psinfo2.imagepath,pslist.hnds,pslist.sess,pslist.thds, '
-                '(SELECT ps2.process_fullname FROM psinfo2 ps2 '
-                'WHERE ps2.pid = psinfo2.ppid) AS parentname'
-                ' from psinfo2 inner join pslist on psinfo2.pid = pslist.pid')
+    rdb = dbops.DBOps(_project.db_name)
+    if rdb.table_exists("psinfo2") and rdb.table_exists("pslist"):
+        cur.execute('select psinfo2.process_fullname,psinfo2.process,psinfo2.pid,'
+                    'psinfo2.ppid,'
+                    'psinfo2.imagepath,pslist.hnds,pslist.sess,pslist.thds, '
+                    '(SELECT ps2.process_fullname FROM psinfo2 ps2 '
+                    'WHERE ps2.pid = psinfo2.ppid) AS parentname'
+                    ' from psinfo2 inner join pslist on psinfo2.pid = pslist.pid')
 
-    rows = cur.fetchall()
-    target_process_list = []
-    full_pslist_dict = {}
+        rows = cur.fetchall()
 
     for rs in rows:
-
-        ps = {}
+        ps = dict()
         ps['pid'] = rs['pid']
         ps['imagepath'] = str(rs['imagepath']).lower().lstrip("c:/\/")
         ps['imagepath'] = str(ps['imagepath']).lstrip('??/\/\c:/\/\/')
@@ -464,7 +467,7 @@ def analyse_scan_processes(_project):
     psxview = []
     apihooked = []
     malfinded = []
-    process_risk = {}
+    process_risk = dict()
 
     ## Analyse further the ones with PID=false psscan=True and ExitTime null
     #select * from psxview where pslist="False" and psscan="True" and exittime="";
@@ -524,7 +527,12 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys=False, indent=4))
+    try:
+        print(json.dumps(in_response, sort_keys=False, indent=4))
+    except TypeError as e:
+        print(json.dumps({"error": "Error with decoding JSON"},
+                         sort_keys=False, indent=4))
+
 
 if __name__ == "__main__":
     #

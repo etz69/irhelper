@@ -65,8 +65,9 @@ def vol_regdump(project):
     cmd_array.append(project.image_name)
     #The command and the output
     cmd_array.append('dumpregistry')
-    cmd_array.append('-o')
+
     if 'offset' in reg_info:
+        cmd_array.append('-o')
         cmd_array.append(reg_info['offset'])
     cmd_array.append('-D')
     cmd_array.append(project.dump_dir)
@@ -97,10 +98,13 @@ def vol_regdump(project):
             result['message'] = "Could not extract SAM registry"
 
     if reg_file != "":
-        j = samparser.main(project.dump_dir+reg_file,"json")
+        try:
+            j = samparser.main(project.dump_dir+reg_file, "json")
 
-        debug("Run samparser")
-        result['cmd_results'] = j
+            debug("Run samparser")
+            result['cmd_results'] = j
+        except Exception as e:
+            err("Could not read registry")
     else:
         err("Could not run samparser")
 
@@ -114,7 +118,7 @@ def get_sam_offset(_project):
     rdb = dbops.DBOps(_project.db_name)
     con.row_factory = sqlite3.Row
     cur = con.cursor()
-    if rdb.table_exists("hivelist"):
+    if rdb.table_exists("HiveList"):
         cur.execute('select virtual,name from hivelist where name like "%Config\SAM%";')
         rows = cur.fetchone()
         data['offset'] = '0x{:x}'.format(int(rows['virtual']))
@@ -132,7 +136,11 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys=False, indent=4))
+    try:
+        print(json.dumps(in_response, sort_keys=False, indent=4))
+    except TypeError as e:
+        print(json.dumps({"error": "Error with decoding JSON"},
+                         sort_keys=False, indent=4))
 
 if __name__ == "__main__":
     #python modules/cmds/vol_regdump_module.py sample001.raw Win7SP1x64

@@ -259,7 +259,11 @@ def get_result():
 
 def show_json(in_response):
     ##Function to test json output
-    print(json.dumps(in_response, sort_keys=False, indent=4))
+    try:
+        print(json.dumps(in_response, sort_keys=False, indent=4))
+    except TypeError as e:
+        print(json.dumps({"error": "Error with decoding JSON"},
+                         sort_keys=False, indent=4))
 
 if __name__ == "__main__":
     #
