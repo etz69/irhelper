@@ -158,11 +158,12 @@ def vol_pslist(_project):
     risk_list = analyse_scan_processes(_project)
     suspicious_plist = []
     for p in risk_list:
-        suspicious_process = {}
+        suspicious_process = dict()
         suspicious_process['pid'] = p
         suspicious_process['risk'] = risk_list[p]
         for i in plist:
             if str(i['pid']) == str(p):
+
                 suspicious_process['name'] = i['name']
                 break
         suspicious_plist.append(suspicious_process.copy())
@@ -312,7 +313,7 @@ def analyse_processes(_project):
     con.row_factory = sqlite3.Row
     cur = con.cursor()
     rdb = dbops.DBOps(_project.db_name)
-    if rdb.table_exists("psinfo2") and rdb.table_exists("pslist"):
+    if rdb.table_exists("psinfo2") and rdb.table_exists("PSList"):
         cur.execute('select psinfo2.process_fullname,psinfo2.process,psinfo2.pid,'
                     'psinfo2.ppid,'
                     'psinfo2.imagepath,pslist.hnds,pslist.sess,pslist.thds, '
