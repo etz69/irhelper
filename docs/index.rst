@@ -93,13 +93,15 @@ Similar tools
 --------------
 
 * Volutility
+* VolatilityBot
 * Evolve
 * DAMM
 
-**DAMM** is the only tool that has a similar objective to irhelper.
-However it is not easy to extend unless the user knows how to write volatility
+**DAMM and VolatilityBot** have similar objectives to irhelper.
+However DAMM is not easy to extend unless the user knows how to write volatility
 code and does not provide standard report at the end of the analysis and integrations
-with 3rd party tools
+with 3rd party tools. VolatilityBot was discovered after started writing irhelper :)
+IRHelper is also not meant to be very production code !
 
 IRHelper concepts
 -----------------
@@ -290,6 +292,39 @@ New module development
 Edit cmd_processor.py and add your module as a method in the Modules() class. For example
 you can follow the skeleton module. All you have to do is return the standard result dict
 and create the appropriate section in jinja style (and bootstrap) in the templates/report.html file.
+
+For example we want to create a new module to capture the command line executed by the user. This
+will be done by running volatility with the cmdscan plugin, store the results in the sqlite and
+finally return a dictionary with the cmds executed.
+
+We will name our module vol_cmdline_module.py and place it inside modules/cmds/
+
+Add our module class name in the cmd_processor.py::
+
+    def vol_cmdscan(self, **kwargs):
+        '''
+        Run cmdscan and record the command execution output
+
+        Args:
+            project (project): the project
+
+        Returns:
+            dict: Returns standard module response dict
+        '''
+
+        if 'project' in kwargs:
+            _project = kwargs['project']
+
+            #The module method to run
+            ircmd.vol_cmdline_module.vol_cmdscan(_project)
+            #Retrieve the results
+            return ircmd.vol_cmdline_module.get_result()
+        else:
+            raise ValueError("Project info is missing")
+
+
+Finally copy the skeleton_module.py in the new file and adjust!
+
 
 
 Research
