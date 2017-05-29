@@ -67,7 +67,7 @@ def vol_pslist(_project):
         for line in vp_psinfo_out.split("\n"):
             try:
                 psinfo_line = line.rstrip("\n").split("|")
-                psinfo = {}
+                psinfo = dict()
                 psinfo['process'] = psinfo_line[0]
                 psinfo['process_fullname'] = psinfo_line[1]
                 psinfo['pid'] = psinfo_line[2]
@@ -95,20 +95,21 @@ def vol_pslist(_project):
 
     ##Run exiftool and store information
     if not rdb.table_exists("exiftool"):
-
-        #cmd = "exiftool -j pslist_dump/*"
-        cmd_array = []
+        cmd_array = list()
         cmd_array.append('exiftool')
+        cmd_array.append('-x Comments')
         cmd_array.append('-j')
         cmd_array.append('-q')
         cmd_array.append(_project.dump_dir)
 
-        debug(cmd_array)
+        cmd = ' '.join(cmd_array)
+        debug(cmd)
+
         try:
-            rc = subprocess.check_output(cmd_array)
+            rc = subprocess.check_output(cmd, shell=True)
             result['status'] = True
-            cmd_out = rc
-        except subprocess.CalledProcessError as e:
+            cmd_out = rc.replace("\\", "")
+        except Exception as e:
             result['status'] = False
             result['message'] = "Exception: exiftool plugin failed!"
             err(result['message'])
@@ -119,7 +120,7 @@ def vol_pslist(_project):
             try:
 
                 jdata = json.loads(cmd_out)
-                jdata_keys = []
+                jdata_keys = list()
 
                 for i in jdata:
                     for n in i.keys():
@@ -138,6 +139,7 @@ def vol_pslist(_project):
                 result['cmd_results'] = "PS info finished"
             except Exception as e:
                 err("Error running exiftool")
+                debug(e)
                 result['errors'].append(e)
 
     ##Now run the analyser code part
@@ -257,8 +259,7 @@ def analyse_processes(_project):
     '''
     print_header("Analysing processes")
 
-
-    violations = []
+    violations = list()
     violations_count = 0
     violation_message = {'process':'','rule': '','details':''}
 
@@ -305,8 +306,8 @@ def analyse_processes(_project):
     ## to minimise false positives . Not all information is available sometimes
 
     ##First put all processes from pslist with enriched info into an array
-    target_process_list = []
-    rows = []
+    target_process_list = list()
+    rows = list()
     full_pslist_dict = dict()
 
     con = sqlite3.connect(_project.db_name)
@@ -374,9 +375,8 @@ def analyse_processes(_project):
                                                             % (check, process[check], rule_list[key][check]))
                             violations.append(violation_message.copy())
 
-
     ##Check for singleton violations as DAMM call it
-    processes = []
+    processes = list()
     for process in target_process_list:
         processes.append(str(process['name']).lower())
 
@@ -465,9 +465,9 @@ def analyse_scan_processes(_project):
             else:
                 err(result['message'])
 
-    psxview = []
-    apihooked = []
-    malfinded = []
+    psxview = list()
+    apihooked = list()
+    malfinded = list()
     process_risk = dict()
 
     ## Analyse further the ones with PID=false psscan=True and ExitTime null

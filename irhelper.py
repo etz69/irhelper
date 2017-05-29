@@ -212,6 +212,11 @@ def main():
     else:
         network_info = response['cmd_results']['network']
 
+    response = run_cmd("vol_cmdscan", project)
+    if not response['status']:
+        err(response['message'])
+    cmd_info = response['cmd_results']['cmds']
+
     ##Write to template
     if not os.path.exists("export"):
         os.makedirs("export")
@@ -232,6 +237,7 @@ def main():
         eplist=eplist,
         suspicious_plist=suspicious_plist,
         users=user_info,
+        cmd_info=cmd_info,
         network_info=network_info
 
     )

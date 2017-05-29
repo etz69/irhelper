@@ -202,3 +202,21 @@ class Modules():
         else:
             raise ValueError("Project info is missing")
 
+
+    def vol_cmdscan(self, **kwargs):
+        '''
+        Run cmdscan and record the command execution output
+
+        Args:
+            project (project): the project
+
+        Returns:
+            dict: Returns standard module response dict
+        '''
+
+        if 'project' in kwargs:
+            _project = kwargs['project']
+            ircmd.vol_cmdline_module.vol_cmdscan(_project)
+            return ircmd.vol_cmdline_module.get_result()
+        else:
+            raise ValueError("Project info is missing")

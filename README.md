@@ -14,7 +14,15 @@ External prerequisites:
 
 * volatility (Mandatory)
 * exiftool (Optional)
-* Clamav (Optional)
+* Clamav (Not yet implemented)
+
+Note: Mac users might get an error related to LOCALE. Run the below on your shell.
+
+```
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+```
+
 
 ```
 git clone https://github.com/etz69/irhelper.git

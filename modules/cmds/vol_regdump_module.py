@@ -13,83 +13,76 @@ result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
 import sqlite3
 
 
-def vol_regdump(project):
+def vol_regdump(_project):
+    global result
 
     print_header("Executing vol_regdump command")
 
-
     ##Construct the required command
     ##First we need to find if the SAM is in memory
-    debug(project.dump_dir)
-
-    cmd_array = []
-    cmd_array.append("vol.py")
-    cmd_array.append('--cache')
-    cmd_array.append('--profile='+project.get_volatility_profile())
-    if project.image_kdgb != "":
-        cmd_array.append('--kdbg='+project.image_kdgb)
-    cmd_array.append('-f')
-    cmd_array.append(project.image_name)
-    #The command and the output
-    cmd_array.append('hivelist')
-    cmd_array.append('--output=sqlite')
-    cmd_array.append('--output-file='+project.db_name)
-
-    debug(cmd_array)
-
-    ##Run the constructed command
-
-    rc = subprocess.call(cmd_array)
-
-    if rc == 0:
-        result['status'] = True
-    else:
-        result['status'] = False
-        result['message'] = "hivelist command failed!"
-        err(result['message'])
+    rdb = dbops.DBOps(_project.db_name)
 
 
-    reg_info = get_sam_offset(project)
+    ##Note this is stdout so we need to store for later
+    vp_dumpreg_out = ""
+    vp_hivelist = {'name': 'hivelist', 'table': 'HiveList',
+                 'output': 'db', 'type': 'default',
+                 'shell': False, 'dump': False, 'parms': None}
+
+    volatility_plugins = [vp_hivelist]
+
+    for plugin in volatility_plugins:
+
+        if not rdb.table_exists(plugin['table']):
+            rc, result = execute_volatility_plugin(plugin_type=plugin['type'],
+                                                   plugin_name=plugin['name'],
+                                                   output=plugin['output'],
+                                                   result=result,
+                                                   project=_project,
+                                                   shell=plugin['shell'],
+                                                   dump=plugin['dump'],
+                                                   plugin_parms=plugin['parms'])
+
+            if result['status']:
+                debug("CMD completed %s" % plugin['name'])
+            else:
+                err(result['message'])
+
+    reg_info = get_sam_offset(_project)
     ##now lets dump the registry from mem
     ##Construct the required command
     ##First we need to find if the SAM is in memory
-
-    cmd_array = []
-    cmd_array.append("vol.py")
-    cmd_array.append('--cache')
-    cmd_array.append('--profile='+project.get_volatility_profile())
-    if project.image_kdgb != "":
-        cmd_array.append('--kdbg='+project.image_kdgb)
-
-    cmd_array.append('-f')
-    cmd_array.append(project.image_name)
-    #The command and the output
-    cmd_array.append('dumpregistry')
+    debug(reg_info)
 
     if 'offset' in reg_info:
-        cmd_array.append('-o')
-        cmd_array.append(reg_info['offset'])
-    cmd_array.append('-D')
-    cmd_array.append(project.dump_dir)
+        parms = "-o "+reg_info['offset']
 
-    debug(cmd_array)
+    plugin = {'name': 'dumpregistry', 'table': 'None',
+                  'output': 'stdout', 'type': 'default',
+                  'shell': True, 'dump': True, 'parms': parms}
 
-    ##Run the constructed command
-    cmd_out = ""
-    reg_file = ""
-    try:
-        rc = subprocess.check_output(cmd_array)
-        result['status'] = True
-        cmd_out = rc
-    except subprocess.CalledProcessError as e:
-        result['status'] = False
-        result['message'] = "Exception: dumpregistry command failed!"
+
+    rc, result = execute_volatility_plugin(plugin_type=plugin['type'],
+                                           plugin_name=plugin['name'],
+                                           output=plugin['output'],
+                                           result=result,
+                                           project=_project,
+                                           shell=plugin['shell'],
+                                           dump=plugin['dump'],
+                                           plugin_parms=plugin['parms'])
+
+    if result['status']:
+        debug("CMD completed %s" % plugin['name'])
+        vp_dumpreg_out = result['cmd_results']
+    else:
         err(result['message'])
 
-    debug(cmd_out)
+    debug(result['cmd_results'])
 
-    if cmd_out != "":
-        matchObj = re.findall(r":\sregistry.*.reg", str(cmd_out), flags=0)
+    reg_file = ""
+
+    if vp_dumpreg_out != "":
+        matchObj = re.findall(r":\sregistry.*.reg", str(vp_dumpreg_out), flags=0)
         reg_file = ""
         try:
             reg_file = matchObj[0].strip(": ")
@@ -99,7 +92,7 @@ def vol_regdump(project):
 
     if reg_file != "":
         try:
-            j = samparser.main(project.dump_dir+reg_file, "json")
+            j = samparser.main(_project.dump_dir+reg_file, "json")
 
             debug("Run samparser")
             result['cmd_results'] = j
@@ -107,7 +100,6 @@ def vol_regdump(project):
             err("Could not read registry")
     else:
         err("Could not run samparser")
-
 
 
 def get_sam_offset(_project):
