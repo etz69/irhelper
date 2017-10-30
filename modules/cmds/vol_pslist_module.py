@@ -187,15 +187,14 @@ def vol_pslist(_project):
 
 def enrich_pslist(_project, plist):
 
-    rdb = dbops.DBOps(_project.db_name)
+    rdbl = dbops.DBOps(_project.db_name)
     query = "select FileName,CompanyName,OriginalFileName," \
             "FileDescription,FileSize,LegalCopyright,FileDescription,md5," \
             "InternalName,sentropy from exiftool"
 
-    jdata = rdb.sqlite_query_to_json(query)
+    jdata = rdbl.sqlite_query_to_json(query)
 
     for entry in jdata:
-        new_entry = {}
         pid = entry['FileName'].split(".")[1]
         entry['pid'] = pid
         for e in plist:

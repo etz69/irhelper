@@ -253,6 +253,7 @@ def generate_network_graph(data, _project):
             f.savefig(_project.report_export_location+"netgraph.png", dpi=200)
         except Exception as e:
             err("Error occured with PyPlot. Try to disable it if does not work")
+            err("No network graph will be generated")
     else:
         debug("PyPlot is disabled. No graph")
 

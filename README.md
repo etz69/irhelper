@@ -1,4 +1,4 @@
-# irhelper
+# IRhelper
 A play POC tool for initial quick analysis of memory images for fun and learning!
 A great way to learn:
 
@@ -38,20 +38,20 @@ vi settings.py
 
 
 And Play !
-python irhelper.py --vt --initdb --debug templates/report.html sample001.bin
+python irhelper.py --hash --vt --initdb --debug templates/report.html sample001.bin
 
 
 
 ```
 
-Note1: If the matplotlib is not working disable in the settings.py file
-Note2: Disable your AV for the directory "irhelper/dump"
+* Note1: If the matplotlib is not working disable in the settings.py file
+* Note2: Disable your AV for the directory "irhelper/dump"
 
 
 
 
 ```
-python irhelper.py -h
+cmd>python irhelper.py -h
 
 usage: irhelper.py [-h] [-p [PROFILE]] [-r [RISK]] [--cache] [--debug]
                    [--initdb] [--hash] [--vt] [--osint] [-v]
