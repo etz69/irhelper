@@ -463,6 +463,7 @@ def get_a_cofee():
 
 def check_entropy_level(sentropy):
     level = "level1"
+
     if float(sentropy) < 0.1:
         level = "level2"
 
@@ -614,11 +615,11 @@ def check_hash_vt(risk_list, check):
             params = {'apikey': VT_API_KEY, 'resource': entry['md5']}
             headers = {
               "Accept-Encoding": "gzip, deflate",
-              "User-Agent" : "Python iRhelper agent"
+              "User-Agent": "Python iRhelper agent"
               }
             try:
                 vt_query = session.get(VT_FILE_API_URL, params=params,
-                                       headers= headers)
+                                       headers=headers)
                 results = json.loads(vt_query.text)
                 if VT_API_TYPE == 'public':
                     sleep(25)
@@ -635,7 +636,7 @@ def check_hash_vt(risk_list, check):
                     entry['permalink'] = ""
                     enhanced_risk_list.append(entry.copy())
 
-            except ValueError:
+            except Exception as e:
                 print("No JSON object could be decoded.")
                 entry['vt_code'] = 0
                 entry['positives'] = 0

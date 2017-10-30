@@ -7,6 +7,7 @@ A great way to learn:
 * Memory forensics
 
 [![Code Climate](https://codeclimate.com/github/etz69/irhelper/badges/gpa.svg)](https://codeclimate.com/github/etz69/irhelper)
+[![Documentation Status](http://readthedocs.org/projects/irhelper/badge/?version=latest)](http://irhelper.readthedocs.io/en/latest/?badge=latest)
 
 Quick install
 ------------
@@ -43,7 +44,8 @@ python irhelper.py --vt --initdb --debug templates/report.html sample001.bin
 
 ```
 
-Note: if the matplotlib is not working disable in the settings.py file
+Note1: If the matplotlib is not working disable in the settings.py file
+Note2: Disable your AV for the directory "irhelper/dump"
 
 
 
@@ -101,5 +103,6 @@ naming tricks, parent process
 * Network connections list
 * Network connection graph based on matplotlib
 * Command line history
+* VirusTotal check of suspicious hashes
 
 Documentation is currently updated to describe all the above features.

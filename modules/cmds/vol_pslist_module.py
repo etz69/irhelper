@@ -201,7 +201,10 @@ def enrich_pslist(_project, plist):
         for e in plist:
             if str(pid) == str(e['pid']):
                 entry['process_name'] = e['name']
-        entry['sn_level'] = check_entropy_level(entry['sentropy'])
+        if entry['sentropy'] is None:
+            entry['sn_level'] = "error"
+        else:
+            entry['sn_level'] = check_entropy_level(entry['sentropy'])
 
     return jdata
 
