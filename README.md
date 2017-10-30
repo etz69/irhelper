@@ -9,6 +9,13 @@ A great way to learn:
 [![Code Climate](https://codeclimate.com/github/etz69/irhelper/badges/gpa.svg)](https://codeclimate.com/github/etz69/irhelper)
 [![Documentation Status](http://readthedocs.org/projects/irhelper/badge/?version=latest)](http://irhelper.readthedocs.io/en/latest/?badge=latest)
 
+IRhelper Report
+------------
+This is how the end report looks like:
+
+[![IRhelper Report](https://github.com/etz69/irhelper/raw/master/docs/artifacts/ScreenShotReport.png)
+
+
 Quick install
 ------------
 External prerequisites:
@@ -94,8 +101,9 @@ is not up to your standards or sth is not working very well !
 * Retrieve all target image information
 * Extract users and relevant timestamps from SAM registry dump
 * Apply rules on running processes. Currently we check the running number of instances,
-naming tricks, parent process
-* Dump all memory processes and retrieve as much information both with exiftool
+naming tricks, parent process utilising more dynamic methods such as Jaro–Winkler distance
+* Dump all memory processes and retrieve as much information both from mem and with exiftool
+* Calculate entropy of memory dump images and ASM suspicious snippets
 * Enhanced process list with PEB info (where available)
 * Suspicious processes. PIDs which exist in psxview, malfind and apihooks
 * Malfind output processor which identifies MZ headers or trampoline style sections
