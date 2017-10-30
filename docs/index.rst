@@ -101,6 +101,7 @@ Similar tools
 However DAMM is not easy to extend unless the user knows how to write volatility
 code and does not provide standard report at the end of the analysis and integrations
 with 3rd party tools. VolatilityBot was discovered after started writing irhelper :)
+although they have quite different objectives.
 IRHelper is also not meant to be very production code !
 
 IRHelper concepts
