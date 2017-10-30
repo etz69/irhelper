@@ -4,8 +4,8 @@ import sys
 sys.path.append(sys.path[0]+"/../../")
 from modules.utils.helper import *
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
-
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
 
 def vol_cmdscan(_project):
     global result
@@ -34,6 +34,7 @@ def vol_cmdscan(_project):
                 debug("CMD completed %s" % plugin['name'])
             else:
                 err(result['message'])
+                result['errors'].append(result['message'])
 
     result['cmd_results'] = {'cmds': []}
     result['cmd_results']['cmds'] = load_cmd_info(_project)

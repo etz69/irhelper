@@ -15,7 +15,8 @@ sys.path.append(sys.path[0]+"/../../")
 from modules.utils.helper import *
 from modules.db import DBops as dbops
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
 
 import sqlite3
 

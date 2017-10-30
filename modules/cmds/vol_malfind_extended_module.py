@@ -4,13 +4,40 @@ import sys
 sys.path.append(sys.path[0]+"/../../")
 from modules.utils.helper import *
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
 
 
 def vol_malfind_extended(_project):
     global result
 
     print_header("Running malfind_extended command")
+
+    rc, result = execute_volatility_plugin(plugin_type="contrib",
+                                            plugin_name="hollowfind",
+                                            output="stdout",
+                                            result=result,
+                                            project=_project,
+                                            shell=False,
+                                            dump=False,
+                                            plugin_parms=None)
+
+    if result['status']:
+        debug("CMD completed")
+    else:
+        err(result['message'])
+        result['errors'].append(result['message'])
+
+    if result['status']:
+        hlfind = HollowfindTool()
+        if hlfind.test():
+            debug("HollowFind ok!")
+        hollow_results = hlfind.parse_output(result['cmd_results'].split('\n'))
+        result['hollow'] = hollow_results
+
+        for h in hollow_results:
+            grisk_dict = {'pid': h['pid'], 'risk': 1}
+            result['risk_index'].append(grisk_dict.copy())
 
     rc, result = execute_volatility_plugin(plugin_type="default",
                                             plugin_name="malfind",
@@ -25,61 +52,80 @@ def vol_malfind_extended(_project):
         debug("CMD completed")
     else:
         err(result['message'])
+        result['errors'].append(result['message'])
 
-    mlf = MafindTool()
-    if mlf.test():
-        debug("MLF ok!")
+    if result['status']:
+        mlf = MafindTool()
+        if mlf.test():
+            debug("MLF ok!")
 
-    sections = []
-    line_number = 0
-    cmd_out = result['cmd_results'].split('\n')
-    for n in cmd_out:
-        debug(n)
-        if n.startswith("Process:"):
-            sections.append(line_number)
+        sections = []
+        line_number = 0
+        cmd_out = result['cmd_results'].split('\n')
+        for n in cmd_out:
+            debug(n)
+            if n.startswith("Process:"):
+                sections.append(line_number)
 
-        line_number += 1
+            line_number += 1
 
-    running = True
-    results = []
-    process_list = {}
+        running = True
+        mal_results = []
+        process_list = {}
 
-    while running:
-        debug(list(enumerate(sections)))
-        if len(list(enumerate(sections))) != 0:
-            for idx, elem in enumerate(sections):
-                if idx == (len(sections)-1):
-                    running = False
-                    break;
-                thiselem = elem
-                nextelem = sections[(idx + 1) % len(sections)]
-                data = mlf.get_section(thiselem,cmd_out,nextelem)
-                pid, name, address = mlf.serialize_data(data)
+        while running:
+            debug(list(enumerate(sections)))
+            if len(list(enumerate(sections))) != 0:
+                last_element = sections[len(sections)-1]
+                for idx, elem in enumerate(sections):
 
-                asm = mlf.get_asm(data)
-                asm_string = ''.join(asm).replace(",","")
+                    if idx == (len(sections)-1):
+                        running = False
+                        thiselem = elem
+                        nextelem = last_element+(len(cmd_out)-1)
+                    else:
+                        thiselem = elem
+                        nextelem = sections[(idx + 1) % len(sections)]
 
-                matches = re.findall('[A-Z]{3}', asm_string, re.DOTALL)
+                    data = mlf.get_section(thiselem, cmd_out, nextelem)
+                    pid, name, address = mlf.serialize_data(data)
 
-                process_list['asm'] = ':'.join(matches)
-                process_list['mem_loc'] = address
-                process_list['pid'] = pid
-                process_list['name'] = name
-                process_list['mz'] = mlf.check_mz(mlf.get_hex_string(data)[0])
-                process_list['entropy'] = calculate_shanon_string(process_list['asm'])
+                    asm = mlf.get_asm(data)
+                    asm_string = ''.join(asm).replace(",","")
 
-                choice = "good"
-                process_list['classification'] = choice
+                    matches = re.findall('[A-Z]{3}', asm_string, re.DOTALL)
 
-                results.append(process_list)
+                    process_list['asm'] = ':'.join(matches)
+                    process_list['hollow'] = False
+                    process_list['mem_loc'] = address
+                    process_list['pid'] = pid
+                    process_list['name'] = name
+                    process_list['mz'] = mlf.check_mz(mlf.get_hex_string(data)[0])
+                    process_list['entropy'] = calculate_shanon_string(process_list['asm'])
 
-                process_list = {}
-        else:
-            debug("No section found")
-            running = False
+                    choice = "good"
+                    if process_list['mz']:
+                        choice = "bad"
+                        grisk_dict = {'pid': process_list['pid'], 'risk': 1}
+                        result['risk_index'].append(grisk_dict.copy())
+
+                    if len(result['hollow']) != 0:
+                        for hollow_process in result['hollow']:
+                            if str(hollow_process['pid']) == str(process_list['pid']):
+                                process_list['hollow'] = True
+
+                    process_list['classification'] = choice
+
+                    mal_results.append(process_list)
+
+                    process_list = {}
+            else:
+                debug("No section found")
+                running = False
+
+        result['malfind'] = mal_results
 
 
-    result['cmd_results'] = results
 
 
 def get_result():
@@ -96,7 +142,6 @@ def show_json(in_response):
 
 
 if __name__ == "__main__":
-    #
     print("Python version: %s\n " % sys.version)
 
     DB_NAME = "results.db"
@@ -107,6 +152,7 @@ if __name__ == "__main__":
     image = sys.argv[1]
     profile = sys.argv[2]
 
+
     ##Call the actual command
     current_wd = sys.path[0]
     my_project = Project(current_wd)
@@ -116,3 +162,9 @@ if __name__ == "__main__":
 
     vol_malfind_extended(my_project)
     show_json(get_result())
+
+
+
+
+
+

@@ -9,14 +9,11 @@ from modules.db import DBops as dbops
 ##TODO remove sqlite and create dbops
 import sqlite3
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
-
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
 
 def vol_pslist(_project):
     global result
-
-    ######TEST AREA
-    ######TEST AREA
 
     print_header("Executing vol_pslist...")
     rdb = dbops.DBOps(_project.db_name)
@@ -59,9 +56,9 @@ def vol_pslist(_project):
                     vp_psinfo_out = result['cmd_results']
             else:
                 err(result['message'])
+                result['errors'].append(result['message'])
 
     if result['status']:
-
         processinfo_data = []
 
         for line in vp_psinfo_out.split("\n"):
@@ -81,6 +78,7 @@ def vol_pslist(_project):
                 processinfo_data.append(psinfo.copy())
             except Exception, e:
                 err(e)
+                result['errors'].append("Error: Executing extended psinfo %s" %e)
                 debug(line)
 
         _table_name = "psinfo2"
@@ -109,9 +107,15 @@ def vol_pslist(_project):
             rc = subprocess.check_output(cmd, shell=True)
             result['status'] = True
             cmd_out = rc.replace("\\", "")
-        except Exception as e:
-            result['status'] = False
+            debug(cmd_out)
+        #except Exception as e:
+        except subprocess.CalledProcessError as e:
+            err(e)
+            result['status'] = True
             result['message'] = "Exception: exiftool plugin failed!"
+            result['errors'].append(result['message'])
+            #raise RuntimeError("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
+            cmd_out = e.output.replace("\\", "")
             err(result['message'])
 
         if result['status']:
@@ -139,17 +143,23 @@ def vol_pslist(_project):
                 result['cmd_results'] = "PS info finished"
             except Exception as e:
                 err("Error running exiftool")
+                result['errors'].append("Error running exiftool")
                 debug(e)
                 result['errors'].append(e)
+
+    ##GLOBAL risk index result['cmd_results']['risk_index']
 
     ##Now run the analyser code part
     violations, plist = analyse_processes(_project)
     result['cmd_results'] = {'violations': [], 'plist': [],
                              'plist_extended': [],
-                             'suspicious_processes': [],}
+                             'suspicious_processes': []}
 
     result['cmd_results']['plist'] = plist
     result['cmd_results']['violations'] = violations
+    for violation in violations:
+        grisk_dict = {'pid': violation['process']['pid'], 'risk': 1}
+        result['risk_index'].append(grisk_dict.copy())
 
     enrich_exif_with_shanon_entropy()
     calculate_md5()
@@ -169,6 +179,9 @@ def vol_pslist(_project):
                 suspicious_process['name'] = i['name']
                 break
         suspicious_plist.append(suspicious_process.copy())
+        grisk_dict = {'pid': suspicious_process['pid'], 'risk': suspicious_process['risk']}
+        result['risk_index'].append(grisk_dict.copy())
+
     result['cmd_results']['suspicious_processes'] = suspicious_plist
 
 

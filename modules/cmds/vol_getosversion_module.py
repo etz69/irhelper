@@ -38,8 +38,8 @@ import sys
 sys.path.append(sys.path[0]+"/../../")
 from modules.utils.helper import *
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
-
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
 
 def vol_getosversion(_project):
     global result
@@ -83,6 +83,7 @@ def vol_getosversion(_project):
         result['cmd_results'] = extract_version_info()
     else:
         err("Will not extract version info")
+        result['errors'].append("Will not extract version info")
 
 
 def extract_version_info():

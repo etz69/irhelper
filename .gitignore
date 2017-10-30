@@ -96,7 +96,6 @@ ENV/
 dump/*
 !dump/.gitkeep
 results.db
-docs/_build
 docs/_static
 export/*
 

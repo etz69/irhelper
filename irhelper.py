@@ -7,6 +7,8 @@ from modules import cmd_processor
 from modules.utils.helper import *
 import sys
 import os
+from datetime import datetime
+import pytz
 
 CACHE_FILE = "/tmp/memoize.pkl"
 
@@ -34,11 +36,14 @@ parser.add_argument("reportTemplate", type=str,
 parser.add_argument("memoryImageFile", type=str,
                     help="The memory image file you want to analyse")
 
-parser.add_argument("-p", '--profile', nargs='?', help="Volatility profile")
+parser.add_argument("-p", '--profile', nargs='?', help="Volatility profile (Optional)")
+parser.add_argument("-r", '--risk', nargs='?', help="Risk level to show processes (default 2)")
 parser.add_argument('--cache', action="store_true", help="Enable cache")
 parser.add_argument('--debug', action="store_true", help="Run in debug")
 parser.add_argument('--initdb', action="store_true", help="Initialise local DB")
 parser.add_argument('--hash', action="store_true", help="Generate hashes")
+parser.add_argument('--vt', action="store_true", help="Check VirusTotal for suspicious hash (API KEY required)")
+parser.add_argument('--osint', action="store_true", help="Check C1fApp for OSINT of ip/domain (API KEY required)")
 parser.add_argument("-v", '--version', action="version",
                     version="%(prog)s v0.1.0")
 
@@ -115,13 +120,35 @@ def main():
         debug("Generating image hash")
         md5 = md5sum(args.memoryImageFile)
         debug("MD5:%s" % md5)
+        sha1 = sha1sum(args.memoryImageFile)
+        debug("SHA1:%s" % sha1)
     else:
         md5 = "NONE"
+        sha1 = "NONE"
+
+    utc = pytz.UTC
+    analysis_timestamp = utc.localize(datetime.now())
+    analysis_timestamp = analysis_timestamp.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    if args.vt:
+        vt_check = True
+    else:
+        vt_check = False
+
+    r = range(1, 4)
+    if args.risk:
+        if not isinstance(args.risk, int) and int(args.risk) not in r:
+            err("Risk level should be integer from 1-4")
+            sys.exit(1)
+        risk_level = args.risk
+    else:
+        risk_level = None
 
     current_wd = sys.path[0]
     project = Project(current_wd)
     project.init_db(DB_NAME)
     project.set_image_name(args.memoryImageFile)
+    risk_index = list()
 
     if args.profile:
         project.set_volatility_profile(args.profile)
@@ -136,6 +163,8 @@ def main():
     debug("Plugins dir: [%s]" % project.plugins_dir)
     debug("Report export dir: [%s]" % project.report_export_location)
     debug("Pyplot flag: [%s]" % project.pyplot_flag)
+
+    ####FINISHED INITIALIZATION
 
     response = run_cmd("vol_imageinfo", project)
 
@@ -176,6 +205,7 @@ def main():
     print("\nWill be using profile: %s" % project.get_volatility_profile())
 
     ##### Basic image info retrieved #####
+    errors = list()
 
     response = run_cmd("vol_getosversion", project)
 
@@ -188,22 +218,30 @@ def main():
     response = run_cmd("vol_pslist", project)
     if not response['status']:
         err(response['message'])
+    errors.append(response['errors'])
     rule_violations = response['cmd_results']['violations']
     plist = response['cmd_results']['plist']
     eplist = response['cmd_results']['plist_extended']
     suspicious_plist = response['cmd_results']['suspicious_processes']
+    risk_index.append(response['risk_index'])
 
     response = run_cmd("vol_malfind_extend", project)
     if not response['status']:
         err(response['message'])
-    malprocesses = response['cmd_results']
+    errors.append(response['errors'])
+    malprocesses = response['malfind']
+    hollowprocesses = response['hollow']
+
+    risk_index.append(response['risk_index'])
 
     response = run_cmd("vol_regdump", project)
+    errors.append(response['errors'])
     if not response['status']:
         err(response['message'])
     user_info = response['cmd_results']
 
     response = run_cmd("vol_netscan", project)
+    errors.append(response['errors'])
     if not response['status']:
         err(response['message'])
 
@@ -211,12 +249,25 @@ def main():
         network_info = {}
     else:
         network_info = response['cmd_results']['network']
+    debug(network_info)
+
+    #network_info = get_cifapp_info(network_info)
+    #debug(network_info)
 
     response = run_cmd("vol_cmdscan", project)
+    errors.append(response['errors'])
     if not response['status']:
         err(response['message'])
     cmd_info = response['cmd_results']['cmds']
 
+    risk_index_final = calculate_risk(risk_index, eplist,plist, risk_level)
+
+
+    ### CHECK IF VT IS REQUESTED
+    if vt_check:
+        risk_index_final = check_hash_vt(risk_index_final, check=True)
+    else:
+        risk_index_final = check_hash_vt(risk_index_final, check=False)
     ##Write to template
     if not os.path.exists("export"):
         os.makedirs("export")
@@ -226,19 +277,26 @@ def main():
 
     env = Environment(loader=FileSystemLoader("./"), trim_blocks=True)
     print("Violations: %s" % len(rule_violations))
+
     mytemplate = env.get_template(args.reportTemplate).render(
         profiles=",".join(profile_array),
+        working_profile=project.get_volatility_profile(),
         image_info=image_info,
+        analysis_timestamp=analysis_timestamp,
         image_md5=md5,
+        image_sha1=sha1,
+        errors=errors,
         version_info=version_info,
         rule_violations=rule_violations,
         malprocesses=malprocesses,
+        hollowprocesses=hollowprocesses,
         plist=plist,
         eplist=eplist,
         suspicious_plist=suspicious_plist,
         users=user_info,
         cmd_info=cmd_info,
-        network_info=network_info
+        network_info=network_info,
+        risk_index=risk_index_final
 
     )
     debug("Writing report to [%s]" % exportpath)
