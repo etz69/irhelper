@@ -5,7 +5,8 @@ var d = document.getElementById("tree-result")
 console.log(d)
 
     load_tree_test();
-    $('#myTable').DataTable();
+    $('#processDumpTable').DataTable();
+    $('#processTable').DataTable();
 
 });
 

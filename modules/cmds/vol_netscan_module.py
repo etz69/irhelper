@@ -15,7 +15,8 @@ sys.path.append(sys.path[0]+"/../../")
 from modules.utils.helper import *
 from modules.db import DBops as dbops
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
 
 import sqlite3
 
@@ -228,27 +229,31 @@ def generate_network_graph(data, _project):
         import matplotlib
         matplotlib.use("Agg", warn=False, force=True)
         import matplotlib.pyplot as plt
+        try:
 
-        backend = matplotlib.get_backend()
-        debug("Using Pyplot backend: %s" % backend)
+            backend = matplotlib.get_backend()
+            debug("Using Pyplot backend: %s" % backend)
 
-        G = nx.DiGraph()
-        G.add_edges_from(data)
-        f = plt.figure()
-        f.patch.set_alpha(0.0)
-        pos = nx.spring_layout(G)
-        node_labels = {node: node for node in G.nodes()}
+            G = nx.DiGraph()
+            G.add_edges_from(data)
+            f = plt.figure()
+            f.patch.set_alpha(0.0)
+            pos = nx.spring_layout(G)
+            node_labels = {node: node for node in G.nodes()}
 
-        font = {'fontname': 'Arial',
-                'color': 'white',
-                'fontweight': 'bold',
-                'fontsize': 14}
-        plt.title("Network connection graph")
-        nx.draw(G, pos, node_size=10 , node_color='red', edge_color='red',
-                font_color='white', labels=node_labels, font_size=8,
-                arrows=False, alpha=0.4)
+            font = {'fontname': 'Arial',
+                    'color': 'white',
+                    'fontweight': 'bold',
+                    'fontsize': 14}
+            plt.title("Network connection graph")
+            nx.draw(G, pos, node_size=10 , node_color='red', edge_color='red',
+                    font_color='white', labels=node_labels, font_size=8,
+                    arrows=False, alpha=0.4)
 
-        f.savefig(_project.report_export_location+"netgraph.png", dpi=200)
+            f.savefig(_project.report_export_location+"netgraph.png", dpi=200)
+        except Exception as e:
+            err("Error occured with PyPlot. Try to disable it if does not work")
+            err("No network graph will be generated")
     else:
         debug("PyPlot is disabled. No graph")
 

@@ -8,7 +8,9 @@ from modules.utils.helper import *
 from modules.utils import samparser
 
 
-result = {'status': True, 'message': '', 'cmd_results': '', 'errors': []}
+result = {'status': True, 'message': '', 'cmd_results': '',
+          'errors': [], 'risk_index': []}
+
 ###TODO: Remove sqlite3
 import sqlite3
 

@@ -10,7 +10,11 @@ import re
 from sets import Set
 import glob
 import os
+import requests
+import json
+from time import sleep
 
+sys.path.append(sys.path[0]+"/../../")
 from modules.db import DBops as dbops
 
 DEBUG = False
@@ -46,6 +50,15 @@ def md5sum(filename):
         for block in iter(lambda: f.read(block_size), b""):
             _hash.update(block)
     return _hash.hexdigest()
+
+def sha1sum(filename):
+    block_size = 65536
+    _hash = hashlib.sha1()
+    with open(filename, "rb") as f:
+        for block in iter(lambda: f.read(block_size), b""):
+            _hash.update(block)
+    return _hash.hexdigest()
+
 
 
 def print_header(msg):
@@ -230,6 +243,40 @@ def execute_volatility_plugin(plugin_type, plugin_name,
     return rc, result
 
 
+class HollowfindTool():
+
+    def test(self):
+        return True
+
+    def parse_output(self, data):
+        ##dirty data extraction routine. Sqlite output is broken
+        results = list()
+        pinfo_hollow = dict()
+
+        count = 0
+        _outlength = 8
+        hfound = False
+        for line in data:
+            l = line.strip("\n\t")
+            if l == "Hollowed Process Information:" or hfound:
+                if count == 1:
+                    pinfo_hollow['pname'] = l.split(" ")[1]
+                if count == 1:
+                    pinfo_hollow['pid'] = l.split(" ")[3]
+                if count == 3:
+                    pinfo_hollow['date'] = l.split(" ")[2]
+                if count == 6:
+                    pinfo_hollow['description'] = l
+                hfound = True
+                count+=1
+
+                if count == _outlength:
+                    hfound = False
+                    count = 0
+                    results.append(pinfo_hollow.copy())
+        return results
+
+
 class MafindTool():
 
     def test(self):
@@ -238,7 +285,7 @@ class MafindTool():
     def get_section(self, sec_number, lines, next_sec):
         return lines[sec_number:next_sec]
 
-    def get_hex_string(self,data):
+    def get_hex_string(self, data):
         ascii_out = []
         for i in range(4,8):
             line = data[i].split(" ")
@@ -250,9 +297,7 @@ class MafindTool():
     def get_asm(self, data):
         p = re.compile(r'(^0x\w+(?:_\w+)?)+(\s\w+\S)+(\s+(\S|\s)+)')
         asm_out = []
-        #print data
         for i in range(9,37):
-            #line = data[i].split(" ")
             try:
                 line = p.split(data[i])
                 asm = line[3].strip("\n").strip(" ").replace("[","").replace("]","")
@@ -261,10 +306,16 @@ class MafindTool():
                 pass
         return asm_out
 
-    def serialize_data(self, data):
+    def serialize_dataORIG(self, data):
         process_id = data[0].split(" ")[3]
         process_name = data[0].split(" ")[1]
         address = data[0].split(" ")[5].strip("\n")
+
+    def serialize_data(self, data):
+        l = data[0].split(" ")
+        process_id = l[l.index('Pid:')+1]
+        process_name = l[l.index('Process:')+1]
+        address = l[l.index('Address:')+1].strip("\n")
 
         return process_id, process_name, address
 
@@ -340,14 +391,21 @@ class Project():
 
     def clean_db(self):
         '''
-        Deletes the DB, deletes all files from dump dir and removes the cache
+        Deletes the DB, cache and all files from dump dir
 
         '''
-        self.rdb.clean_db(self.db_name)
         files_to_delete = glob.glob(self.dump_dir+"*")
+        self.rdb.clean_db(self.db_name)
+
+        cache_file = "/tmp/memoize.pkl"
+        try:
+            os.remove(cache_file)
+        except Exception as e:
+            pass
+
         if len(files_to_delete) > 0:
             print("I am about to delete [%d] files "
-                  "from: [%s]" % (len(files_to_delete), self.dump_dir))
+                  "from: [%s] and erase the DB" % (len(files_to_delete), self.dump_dir))
             choice = raw_input("Confirm [y/n]")
 
             if choice == "n":
@@ -405,6 +463,7 @@ def get_a_cofee():
 
 def check_entropy_level(sentropy):
     level = "level1"
+
     if float(sentropy) < 0.1:
         level = "level2"
 
@@ -413,6 +472,229 @@ def check_entropy_level(sentropy):
 
     return level
 
+
+def calculate_risk(risk_index, process_info, plist, risk_level):
+    list_of_suspicious_processes = list()
+    suspicious_process = dict()
+
+    rdict = dict()
+    for el in risk_index:
+        if type(el) == list:
+            for e in el:
+                if e['pid'] in rdict:
+                    rdict[e['pid']] = rdict[e['pid']]+e['risk']
+                else:
+                    rdict[e['pid']] = e['risk']
+        else:
+            if el['pid'] in rdict:
+                rdict[el['pid']] = rdict[el['pid']]+el['risk']
+            else:
+                rdict[el['pid']] = el['risk']
+
+    if risk_level is None:
+        print("User Risk level is none. Defaulting to L2 and above ")
+    pextended = True
+    if len(process_info) == 0:
+        pextended = False
+        process_info = plist
+
+    for risk_process in rdict:
+        for process in process_info:
+            if str(process['pid']) == str(risk_process):
+                suspicious_process['pid'] = risk_process
+                if pextended:
+                    suspicious_process['name'] = process['process_name']
+                    suspicious_process['md5'] = process['md5']
+                else:
+                    suspicious_process['name'] = process['name']
+                    suspicious_process['md5'] = "-"
+
+
+                suspicious_process['risk_index'] = rdict[risk_process]
+                if risk_level is None:
+                    if int(suspicious_process['risk_index']) >= 2:
+                        list_of_suspicious_processes.append(suspicious_process.copy())
+                else:
+                    if int(suspicious_process['risk_index']) >= int(risk_level):
+                        list_of_suspicious_processes.append(suspicious_process.copy())
+
+    return list_of_suspicious_processes
+
+
+def get_cifapp_info(data):
+
+    session = requests.Session()
+    indicators = list()
+    config = ConfigParser.ConfigParser()
+    try:
+        config.read(SETTINGS_FILE)
+        API_KEY = config.get('c1fapp', 'C1F_API_KEY').strip("'")
+        API_URL = config.get('c1fapp', 'C1F_API_URL').strip("'")
+    except Exception as e:
+        err("No C1F Key found")
+        sys.exit(1)
+
+    for entry in data:
+        indicator_report = dict()
+
+        if entry['address_type'] == "PUBLIC":
+            print(entry)
+            payload = {'key': API_KEY,
+                       'format': 'json',
+                       'backend': 'es',
+                       'request': entry['ip_address']
+            }
+
+            indicator_report['found'] = False
+            indicator_report['country'] = ""
+
+            countries = list()
+            c1fapp_query = session.post(API_URL, data=json.dumps(payload))
+
+            try:
+                results = json.loads(c1fapp_query.text)
+
+                if len(results) > 0:
+                    indicator_report['found'] = True
+
+                    for i in results:
+                        if "country" in i:
+                            countries.append(i['country'][0])
+
+            except ValueError:
+                print("No JSON object could be decoded.")
+
+            if indicator_report['found'] and len(countries) > 0:
+                indicator_report['countries'] = list(set(countries)[0])
+
+            entry['indicator_report'] = indicator_report.copy()
+            indicators.append(entry)
+        else:
+            indicator_report['found'] = False
+            indicator_report['country'] = ""
+            entry['indicator_report'] = indicator_report.copy()
+            indicators.append(entry)
+
+    return indicators
+
+
+def check_hash_vt(risk_list, check):
+
+    enhanced_risk_list = list()
+
+    if not check:
+        for entry in risk_list:
+            entry['vt_code'] = 0
+            entry['positives'] = 0
+            entry['total'] = 0
+            entry['permalink'] = ""
+            enhanced_risk_list.append(entry.copy())
+
+        return enhanced_risk_list
+
+    config = ConfigParser.ConfigParser()
+    config.read(SETTINGS_FILE)
+    try:
+        config.read(SETTINGS_FILE)
+        VT_API_KEY = config.get('virustotal', 'VT_API_KEY').strip("'")
+        VT_FILE_API_URL = config.get('virustotal', 'VT_FILE_API_URL').strip("'")
+        VT_API_TYPE = config.get('virustotal', 'VT_API_TYPE').strip("'")
+    except Exception as e:
+        err("No VT Key found")
+        sys.exit(1)
+
+    session = requests.Session()
+    count = int(len(risk_list))
+    if VT_API_TYPE == 'public':
+        print("*** VT KEY is public. Applying 25 sec throttling! ***")
+        time_elapsed_public = (int(count)*25)/60
+        print("*** This will take approximately [%d] minutes     ***" %time_elapsed_public)
+
+    for entry in risk_list:
+        if entry['md5'] != "-":
+            params = {'apikey': VT_API_KEY, 'resource': entry['md5']}
+            headers = {
+              "Accept-Encoding": "gzip, deflate",
+              "User-Agent": "Python iRhelper agent"
+              }
+            try:
+                vt_query = session.get(VT_FILE_API_URL, params=params,
+                                       headers=headers)
+                results = json.loads(vt_query.text)
+                if VT_API_TYPE == 'public':
+                    sleep(25)
+                if results['response_code'] == 1:
+                    entry['vt_code'] = 1
+                    entry['positives'] = results['positives']
+                    entry['total'] = results['total']
+                    entry['permalink'] = results['permalink']
+                    enhanced_risk_list.append(entry.copy())
+                else:
+                    entry['vt_code'] = 0
+                    entry['positives'] = 0
+                    entry['total'] = 0
+                    entry['permalink'] = ""
+                    enhanced_risk_list.append(entry.copy())
+
+            except Exception as e:
+                print("No JSON object could be decoded.")
+                entry['vt_code'] = 0
+                entry['positives'] = 0
+                entry['total'] = 0
+                entry['permalink'] = ""
+                enhanced_risk_list.append(entry.copy())
+        else:
+            entry['vt_code'] = 0
+            entry['positives'] = 0
+            entry['total'] = 0
+            entry['permalink'] = ""
+            enhanced_risk_list.append(entry.copy())
+
+
+    return enhanced_risk_list
+
+
+
+def sqlite_to_es(db_file):
+    ##Get all the tables
+    ##SELECT name FROM sqlite_master WHERE type='table';
+
+    #for every table read all data and transform to dict with
+    #  keys from column names
+    ## We can use DBops.sqlite_query_to_json(query) for this
+
+    pass
+
+
+
+if __name__ == "__main__":
+
+    DB_NAME = "results.db"
+
+    set_debug(True)
+    import sqlite3
+
+    ##Call the actual command
+    current_wd = sys.path[0]
+    my_project = Project(current_wd)
+    my_project.init_db(DB_NAME)
+
+    rdb = dbops.DBOps(my_project.db_name)
+    conn = sqlite3.connect(my_project.db_name)
+
+    sql = 'SELECT name FROM sqlite_master WHERE type="table"'
+
+    c = conn.cursor()
+    c.row_factory = sqlite3.Row
+    c.execute(sql)
+
+    tables = c.fetchall()
+
+    for table in tables:
+        print(table[0])
+
+    results = rdb.sqlite_query_to_json("select * from SystemInfo")
+    print(json.dumps(results, sort_keys=False, indent=4))
 
 
 
