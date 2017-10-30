@@ -13,7 +13,7 @@ IRhelper Report
 ------------
 This is how the end report looks like:
 
-[![IRhelper Report](https://github.com/etz69/irhelper/raw/master/docs/artifacts/ScreenShotReport.png)
+![IRhelper Report](https://github.com/etz69/irhelper/raw/master/docs/artifacts/ScreenShotReport.png)
 
 
 Quick install
