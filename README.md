@@ -11,8 +11,11 @@ A great way to learn:
 
 IRhelper Report
 ------------
-You can find various memory images to play [![here]] (https://github.com/volatilityfoundation/volatility/wiki/Memory-Samples)
-The below report is from the stuxnet image from the [![Malware cookbook DVD]] (https://www.sendspace.com/pro/dl/p87m18)
+You can find various memory images to play
+[here](https://github.com/volatilityfoundation/volatility/wiki/Memory-Samples)
+
+
+The below report is from the stuxnet image from the [Malware cookbook DVD] (https://www.sendspace.com/pro/dl/p87m18)
 
 
 This is how the end report looks like after running irheper with default settings.
