@@ -16,7 +16,7 @@ You can find various memory images to play
 
 
 The below report is from the stuxnet image from the
-[Malware cookbook DVD] (https://www.sendspace.com/pro/dl/p87m18)
+[Malware cookbook DVD](https://www.sendspace.com/pro/dl/p87m18)
 
 
 This is how the end report looks like after running irheper with default settings.
