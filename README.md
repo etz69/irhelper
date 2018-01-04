@@ -11,17 +11,21 @@ A great way to learn:
 
 IRhelper Report
 ------------
-This is how the end report looks like:
+You can find various memory images to play [![here]] (https://github.com/volatilityfoundation/volatility/wiki/Memory-Samples)
+The below report is from the stuxnet image from the [![Malware cookbook DVD]] (https://www.sendspace.com/pro/dl/p87m18)
 
-[![IRhelper Report](https://github.com/etz69/irhelper/raw/master/docs/artifacts/ScreenShotReport.png)
 
+This is how the end report looks like after running irheper with default settings.
+
+
+![IRhelper Report](https://github.com/etz69/irhelper/raw/master/docs/artifacts/ScreenShotReport.png)
 
 Quick install
 ------------
 External prerequisites:
 
 * volatility (Mandatory)
-* exiftool (Optional but highly recommended)
+* exiftool (Optional but highly recommended!)
 * Clamav (Not yet implemented)
 
 Note: Mac users might get an error related to LOCALE. Run the below on your shell.
@@ -33,21 +37,24 @@ export LANG=en_US.UTF-8
 
 
 ```
+cd /tmp
 git clone https://github.com/etz69/irhelper.git
 cd irhelper
 virtualenv venv
 source venv/bin/activate
 pip install -r requirements.txt
+python irhelper.py -h (to view usage)
 
 vi settings.py
 * Edit all locations with the full path of your irhelper installation
-* Add any API Keys required (VT, C1fApp)
+* Add any API Keys required (VT, C1fApp). VT has a default public key which
+ might not be valid at the time of the download.
 
 
 And Play !
 python irhelper.py --hash --vt --initdb --debug templates/report.html sample001.bin
 
-
+Finally report is generated in local export/ directory as "report.html"
 
 ```
 
